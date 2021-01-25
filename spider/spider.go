@@ -3,6 +3,7 @@ package spider
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/leosykes117/gocrawler/spider/crawler"
 	"github.com/leosykes117/gocrawler/spider/scraper"
@@ -38,12 +39,30 @@ func (spd *spider) StartScraper() {
 	fmt.Println("Vamos a comenzar")
 	spd.s.GetAllUrls()
 	
-	fmt.Println("Escribiendo links")
+	fmt.Println("Escribiendo los productos obtenidos...")
 
-	if err := saveUrls("./urls_from_colly.txt", spd.s.Links()); err != nil {
-		fmt.Println("No se pudieron escribir los enlaces")
+	filename, err := getFilePath("products.txt")
+	fmt.Println("Ruta del archivo", filename)
+	if err != nil {
+		fmt.Println("Error al escribir el archivo")
+		return
+	}
+
+	if err = saveUrls(filename, spd.s.ProductNames()); err != nil {
+		fmt.Println("No se pudieron escribir los nombres de los productos")
+		return
 	}
 	fmt.Println("Finalizado")
+}
+
+func getFilePath (filename string) (string, error) {
+	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
+	wd, _ := os.Getwd()
+	fmt.Println("WD", wd)
+	if err != nil {
+			return "", err
+	}	
+	return dir + "/" + filename, nil
 }
 
 func saveUrls(filePath string, values []string) error {

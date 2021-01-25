@@ -12,6 +12,5 @@ func main() {
 	//spider.StartCrawler()
 	spider.StartScraper()
 	endTimer := time.Now().UnixNano() / int64(time.Millisecond)
-	fmt.Println(endTimer)
-	fmt.Println("TIEMPO:", (endTimer - initTimer) / int64(time.Millisecond))
+	fmt.Printf("Tiempo: %v s", (endTimer - initTimer) / 1000)
 }
