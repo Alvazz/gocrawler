@@ -1,53 +1,60 @@
 package scraper
 
 import (
+	"log"
 	"strings"
 	"time"
-	"log"
 
 	"github.com/gocolly/colly"
-	"github.com/gocolly/colly/proxy"
+	"github.com/gocolly/colly/extensions"
+	_ "github.com/gocolly/colly/proxy"
 )
 
 type Scraper struct {
-	links			[]string
-	productNames	[]string
+	links        []string
+	productNames []string
 }
 
 func New() *Scraper {
-	return &Scraper {}
+	return &Scraper{}
 }
 
-func (c *Scraper) Links() []string { return c.links }
+func (c *Scraper) Links() []string        { return c.links }
 func (c *Scraper) ProductNames() []string { return c.productNames }
 
 // Start inicia el crawler
 func (s *Scraper) GetAllUrls() {
 	log.Println("Comenzando")
 	c := colly.NewCollector(
-		colly.UserAgent("Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36"),
 		colly.AllowedDomains("https://www.mixup.com.mx", "www.mixup.com.mx", "mixup.com.mx"),
 		colly.MaxDepth(5),
 		colly.Async(true),
 	)
 
-	rp, err := proxy.RoundRobinProxySwitcher("http://187.243.253.2:8080", "http://162.144.106.245:3838", "http://161.35.4.201:80")
+	extensions.RandomUserAgent(c)
+	extensions.Referer(c)
+
+	/* rp, err := proxy.RoundRobinProxySwitcher("http://187.243.253.2:8080", "http://162.144.106.245:3838", "http://161.35.4.201:80")
 	if err != nil {
 		log.Fatal(err)
 	}
-	c.SetProxyFunc(rp)
+	c.SetProxyFunc(rp) */
 
 	log.Println("Collector creado")
 
 	c.Limit(&colly.LimitRule{
 		Parallelism: 2,
-		Delay: 45 * time.Second,
-		//RandomDelay: 45 * time.Second,
+		//Delay: 10 * time.Second,
+		RandomDelay: 20 * time.Second,
 	})
 
+	// callback
 	c.OnRequest(func(r *colly.Request) {
-		''
-		r.Headers.Set("Referer", "https://www.facebook.com/")
+		r.Headers.Set("Referer", "https://facebook.com/")
+		r.Headers.Set("DNT", "1")
+		r.Headers.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9")
+		log.Println("USER AGENT -->", r.Headers.Get("User-Agent"))
+
 	})
 
 	// callback,para saber que pagina se ha visitado
