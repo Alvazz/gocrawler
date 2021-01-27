@@ -7,6 +7,7 @@ import (
 
 	"github.com/gocolly/colly"
 	"github.com/gocolly/colly/extensions"
+	"github.com/gocolly/colly/proxy"
 	_ "github.com/gocolly/colly/proxy"
 )
 
@@ -34,17 +35,17 @@ func (s *Scraper) GetAllUrls() {
 	extensions.RandomUserAgent(c)
 	extensions.Referer(c)
 
-	/* rp, err := proxy.RoundRobinProxySwitcher("http://187.243.253.2:8080", "http://162.144.106.245:3838", "http://161.35.4.201:80")
+	rp, err := proxy.RoundRobinProxySwitcher("socks5://127.0.0.1:9050", "socks5://127.0.0.1:9050", "http://161.35.4.201:80")
 	if err != nil {
 		log.Fatal(err)
 	}
-	c.SetProxyFunc(rp) */
+	c.SetProxyFunc(rp)
 
 	log.Println("Collector creado")
 
 	c.Limit(&colly.LimitRule{
 		Parallelism: 2,
-		//Delay: 10 * time.Second,
+		Delay:       5 * time.Second,
 		RandomDelay: 20 * time.Second,
 	})
 
