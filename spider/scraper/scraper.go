@@ -7,23 +7,26 @@ import (
 
 	"github.com/gocolly/colly"
 	"github.com/gocolly/colly/extensions"
-	"github.com/gocolly/colly/proxy"
-	_ "github.com/gocolly/colly/proxy"
 )
 
+// Scraper es la clase para crear una instancia de la araña web
 type Scraper struct {
 	links        []string
 	productNames []string
 }
 
+// New es el metodo que instancia la clase Scraper
 func New() *Scraper {
 	return &Scraper{}
 }
 
-func (c *Scraper) Links() []string        { return c.links }
+// Links devuelve los enlaces obtenidos durante el raspado
+func (c *Scraper) Links() []string { return c.links }
+
+// ProductNames devuelve los nombres de los productos obtenidos
 func (c *Scraper) ProductNames() []string { return c.productNames }
 
-// Start inicia el crawler
+// GetAllUrls inicia el rasapado de datos
 func (s *Scraper) GetAllUrls() {
 	log.Println("Comenzando")
 	c := colly.NewCollector(
@@ -35,11 +38,11 @@ func (s *Scraper) GetAllUrls() {
 	extensions.RandomUserAgent(c)
 	extensions.Referer(c)
 
-	rp, err := proxy.RoundRobinProxySwitcher("socks5://127.0.0.1:9050", "socks5://127.0.0.1:9050", "http://161.35.4.201:80")
+	/* rp, err := proxy.RoundRobinProxySwitcher("https://103.47.172.110:8080", "https://103.122.252.110:8080", "https://45.130.96.25:8080")
 	if err != nil {
 		log.Fatal(err)
 	}
-	c.SetProxyFunc(rp)
+	c.SetProxyFunc(rp) */
 
 	log.Println("Collector creado")
 
