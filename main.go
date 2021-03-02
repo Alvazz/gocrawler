@@ -1,10 +1,16 @@
 package main
 
 import (
-	"log"
+	"fmt"
 	"time"
 
 	"github.com/leosykes117/gocrawler/spider"
+)
+
+const (
+	eqHours   uint64 = 3600000
+	eqMinutes uint64 = 60000
+	eqSeconds uint64 = 1000
 )
 
 func main() {
@@ -13,5 +19,8 @@ func main() {
 	//spider.StartCrawler()
 	spider.StartScraper()
 	endTimer := time.Now().UnixNano() / int64(time.Millisecond)
-	log.Printf("Tiempo: %v s", (endTimer-initTimer)/1000)
+	fmt.Println("Tiempo")
+	fmt.Println("\tHoras:", (endTimer-initTimer)/int64(eqHours))
+	fmt.Println("\tMinutes:", (endTimer-initTimer)/int64(eqMinutes))
+	fmt.Println("\tSegundos:", (endTimer-initTimer)/int64(eqSeconds))
 }

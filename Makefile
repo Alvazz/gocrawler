@@ -22,3 +22,10 @@ unit-test-coverage:
 .PHONY: lint
 lint:
 	@docker build . --target lint
+
+.PHONY: debug
+debug:
+	@echo Construyendo imagen de ubuntu
+	@docker build . \
+	-t debug-app \
+	-f Dockerfile.debug

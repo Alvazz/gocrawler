@@ -2,12 +2,30 @@ package scraper
 
 import (
 	"log"
+	"math/rand"
 	"strings"
 	"time"
 
 	"github.com/gocolly/colly"
 	"github.com/gocolly/colly/extensions"
 )
+
+// httpHeader es el tipo de dato que contieee las cabeceras de las peticiones http de los sitios web.
+type httpHeaders map[string]string
+
+// headers lista de httpHeader
+type headers []httpHeaders
+
+var headersPool = headers{
+	{
+		"DNT":             "1",
+		"Accept":          "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
+		"Accept-Encoding": "gzip, deflate, br",
+		"Accept-Language": "es-US,es-419;q=0.9,es;q=0.8,en;q=0.7",
+		"Cache-Control":   "max-age=0",
+		"Connection":      "keep-alive",
+	},
+}
 
 // Scraper es la clase para crear una instancia de la araña web
 type Scraper struct {
@@ -33,9 +51,9 @@ func (s *Scraper) GetAllUrls() {
 		colly.AllowedDomains("https://www.mixup.com.mx", "www.mixup.com.mx", "mixup.com.mx"),
 		colly.MaxDepth(5),
 		colly.Async(true),
+		colly.UserAgent("Mozilla/5.0 (iPhone; CPU iPhone OS 12_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/69.0.3497.105 Mobile/15E148 Safari/605.1"),
 	)
 
-	extensions.RandomUserAgent(c)
 	extensions.Referer(c)
 
 	/* rp, err := proxy.RoundRobinProxySwitcher("https://103.47.172.110:8080", "https://103.122.252.110:8080", "https://45.130.96.25:8080")
@@ -48,17 +66,17 @@ func (s *Scraper) GetAllUrls() {
 
 	c.Limit(&colly.LimitRule{
 		Parallelism: 2,
-		Delay:       5 * time.Second,
-		RandomDelay: 20 * time.Second,
+		//Delay:       120 * time.Second,
+		RandomDelay: 300 * time.Second,
 	})
 
 	// callback
 	c.OnRequest(func(r *colly.Request) {
-		r.Headers.Set("Referer", "https://facebook.com/")
-		r.Headers.Set("DNT", "1")
-		r.Headers.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9")
-		log.Println("USER AGENT -->", r.Headers.Get("User-Agent"))
-
+		//r.Headers.Set("Referer", "https://facebook.com/")
+		hds := headersPool[rand.Intn(len(headersPool))]
+		for key, value := range hds {
+			r.Headers.Set(key, value)
+		}
 	})
 
 	// callback,para saber que pagina se ha visitado
