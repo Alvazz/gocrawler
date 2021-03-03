@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/leosykes117/gocrawler/spider"
+	"github.com/leosykes117/gocrawler/scraper"
 )
 
 const (
@@ -15,9 +15,8 @@ const (
 
 func main() {
 	initTimer := time.Now().UnixNano() / int64(time.Millisecond)
-	spider := spider.New()
-	//spider.StartCrawler()
-	spider.StartScraper()
+	spider := scraper.New()
+	spider.GetAllUrls()
 	endTimer := time.Now().UnixNano() / int64(time.Millisecond)
 	fmt.Println("Tiempo")
 	fmt.Println("\tHoras:", (endTimer-initTimer)/int64(eqHours))

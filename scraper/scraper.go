@@ -1,8 +1,11 @@
 package scraper
 
 import (
+	"fmt"
 	"log"
 	"math/rand"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -39,10 +42,10 @@ func New() *Scraper {
 }
 
 // Links devuelve los enlaces obtenidos durante el raspado
-func (c *Scraper) Links() []string { return c.links }
+func (s *Scraper) Links() []string { return s.links }
 
 // ProductNames devuelve los nombres de los productos obtenidos
-func (c *Scraper) ProductNames() []string { return c.productNames }
+func (s *Scraper) ProductNames() []string { return s.productNames }
 
 // GetAllUrls inicia el rasapado de datos
 func (s *Scraper) GetAllUrls() {
@@ -56,27 +59,23 @@ func (s *Scraper) GetAllUrls() {
 
 	extensions.Referer(c)
 
-	/* rp, err := proxy.RoundRobinProxySwitcher("https://103.47.172.110:8080", "https://103.122.252.110:8080", "https://45.130.96.25:8080")
-	if err != nil {
-		log.Fatal(err)
-	}
-	c.SetProxyFunc(rp) */
-
 	log.Println("Collector creado")
 
+	c.SetRequestTimeout(140 * time.Second)
 	c.Limit(&colly.LimitRule{
 		Parallelism: 2,
-		//Delay:       120 * time.Second,
+		Delay:       140 * time.Second,
 		RandomDelay: 300 * time.Second,
 	})
 
 	// callback
 	c.OnRequest(func(r *colly.Request) {
-		//r.Headers.Set("Referer", "https://facebook.com/")
+		log.Printf("Visitando el sitio: %s\n", r.URL.String())
 		hds := headersPool[rand.Intn(len(headersPool))]
 		for key, value := range hds {
 			r.Headers.Set(key, value)
 		}
+		//log.Printf("cookies antes de la petición --> %v", r.Headers.Get("Cookies"))
 	})
 
 	// callback,para saber que pagina se ha visitado
@@ -86,13 +85,15 @@ func (s *Scraper) GetAllUrls() {
 			log.Println("No se encontro el link")
 		} else {
 			s.links = append(s.links, link)
+			siteCookies := c.Cookies(link)
+			if err := c.SetCookies(link, siteCookies); err != nil {
+				log.Println("SET COOKIES ERROR: ", err)
+			}
 			e.Request.Visit(link)
 		}
 	})
 
 	c.OnHTML(".titulo", func(e *colly.HTMLElement) {
-		log.Println("TITULO OBTENIDO")
-		log.Printf("element %+v\n", e)
 		title := strings.TrimSpace(e.Text)
 		if title == "" {
 			log.Println("No se encontró el título")
@@ -103,12 +104,13 @@ func (s *Scraper) GetAllUrls() {
 
 	// callback
 	c.OnError(func(r *colly.Response, e error) {
-		log.Println("error:", e, r.Request.URL, string(r.Body))
+		log.Println("ERROR:", e, r.Request.URL, string(r.Body))
 	})
 
-	// callback, nos reponde con la pagina que esta visitando
+	// callback, nos reponde con la pagina que ha visitando
 	c.OnResponse(func(r *colly.Response) {
-		log.Println("Visitado", r.Request.URL)
+		log.Println("Página visitada", r.Request.URL)
+		log.Printf("Cookies de la petición: %+v\n", r.Request.Headers.Get("Cookie"))
 	})
 
 	// sitio que vamos a visitar
@@ -116,4 +118,41 @@ func (s *Scraper) GetAllUrls() {
 	log.Println("Despues de visit")
 	c.Wait()
 	log.Println("TERMINANDO EL SCRAPING")
+	log.Println("Escribiendo los resultados")
+	filename, err := getFilePath("products.txt")
+
+	if err != nil {
+		log.Fatalf("Ocurrio un error al crear el archivo: %v", err)
+	}
+
+	err = s.saveUrls(filename)
+	if err != nil {
+		log.Fatalf("Ocurrio un error al escribir los elementos en el archivo: %v", err)
+	}
+
+	log.Printf("Archivo creado en %s\n", filename)
+}
+
+// getFilePath Crear la ruta del donde escribir el archivo
+func getFilePath(filename string) (string, error) {
+	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
+	wd, _ := os.Getwd()
+	fmt.Println("WD", wd)
+	if err != nil {
+		return "", err
+	}
+	return dir + "/" + filename, nil
+}
+
+// saveUrls escribe en un archivo los productos obtenidos
+func (s *Scraper) saveUrls(filePath string) error {
+	f, err := os.Create(filePath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	for _, value := range s.productNames {
+		fmt.Fprintln(f, value)
+	}
+	return nil
 }
