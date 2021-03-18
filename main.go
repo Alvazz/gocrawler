@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/leosykes117/gocrawler/scraper"
+	_ "github.com/leosykes117/gocrawler/switcher"
 )
 
 const (
