@@ -75,7 +75,6 @@ func (s *Scraper) GetAllUrls() {
 		for key, value := range hds {
 			r.Headers.Set(key, value)
 		}
-		//log.Printf("cookies antes de la petición --> %v", r.Headers.Get("Cookies"))
 	})
 
 	// callback,para saber que pagina se ha visitado
@@ -89,7 +88,7 @@ func (s *Scraper) GetAllUrls() {
 			if err := c.SetCookies(link, siteCookies); err != nil {
 				log.Println("SET COOKIES ERROR: ", err)
 			}
-			e.Request.Visit(link)
+			c.Visit(e.Request.AbsoluteURL(link))
 		}
 	})
 

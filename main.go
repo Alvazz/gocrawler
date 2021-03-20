@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/leosykes117/gocrawler/scraper"
-	_ "github.com/leosykes117/gocrawler/switcher"
 )
 
 const (
@@ -16,8 +15,15 @@ const (
 
 func main() {
 	initTimer := time.Now().UnixNano() / int64(time.Millisecond)
-	spider := scraper.New()
-	spider.GetAllUrls()
+
+	/* spider := scraper.New()
+	spider.GetAllUrls() */
+	sw := scraper.NewSwitcher()
+	for i := 0; i < 5; i++ {
+		sw.RotateIP()
+		time.Sleep(time.Duration(7 * time.Second))
+	}
+
 	endTimer := time.Now().UnixNano() / int64(time.Millisecond)
 	fmt.Println("Tiempo")
 	fmt.Println("\tHoras:", (endTimer-initTimer)/int64(eqHours))
