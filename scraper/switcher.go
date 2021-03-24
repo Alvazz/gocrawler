@@ -174,9 +174,9 @@ func (sw *Switcher) RotateIP() error {
 			time.Sleep(time.Duration(2 * time.Second))
 			log.Println("Comprando conexión e IP")
 			ipinfo, online := IsOnline()
-			log.Printf("ipinfo.IP: %s\tCommunIP: %s", ipinfo.IP, sw.GetCommunIP().IP)
 			if online && ipinfo.IP == sw.GetCommunIP().IP {
 				log.Printf("IP default: %+v", ipinfo)
+				log.Printf("ipinfo.IP: %s\tCommunIP: %s", ipinfo.IP, sw.GetCommunIP().IP)
 				break
 			}
 			log.Println("Aún conectado a la VPN")
