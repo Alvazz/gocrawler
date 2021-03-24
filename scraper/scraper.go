@@ -134,13 +134,27 @@ func (s *Scraper) GetAllUrls() {
 
 // getFilePath Crear la ruta del donde escribir el archivo
 func getFilePath(filename string) (string, error) {
-	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
-	wd, _ := os.Getwd()
-	fmt.Println("WD", wd)
+	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	return dir + "/" + filename, nil
+	fmt.Println(home)
+	dir, err := filepath.Abs(filepath.Join(home, "./crawling-data/outs/"))
+	if err != nil {
+		return "", err
+	}
+	if _, err := os.Stat(dir); err != nil {
+		if os.IsNotExist(err) {
+			fmt.Println(err)
+			fmt.Println("Creando dir")
+			if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+				return "", err
+			}
+		} else {
+			return "", err
+		}
+	}
+	return filepath.Join(dir, filename), nil
 }
 
 // saveUrls escribe en un archivo los productos obtenidos
