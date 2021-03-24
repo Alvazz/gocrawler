@@ -172,7 +172,7 @@ func (sw *Switcher) RotateIP() error {
 			}
 			log.Println("Esperando...")
 			time.Sleep(time.Duration(2 * time.Second))
-			log.Println("Comprando conexión e IP")
+			log.Println("Comparando conexión e IP")
 			ipinfo, online := IsOnline()
 			if online && ipinfo.IP == sw.GetCommunIP().IP {
 				log.Printf("IP default: %+v", ipinfo)
@@ -198,7 +198,7 @@ func (sw *Switcher) RotateIP() error {
 		}
 		log.Println("Esperando...")
 		time.Sleep(time.Duration(2 * time.Second))
-		log.Println("Comprando conexión e IP")
+		log.Println("Comparando conexión e IP")
 		ipinfo, online := IsOnline()
 		if online && ipinfo.IP != sw.GetCommunIP().IP {
 			log.Printf("Nueva IP: %+v", ipinfo)

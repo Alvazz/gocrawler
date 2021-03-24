@@ -7,26 +7,20 @@ import (
 	"github.com/leosykes117/gocrawler/scraper"
 )
 
-const (
-	eqHours   uint64 = 3600000
-	eqMinutes uint64 = 60000
-	eqSeconds uint64 = 1000
-)
-
 func main() {
-	initTimer := time.Now().UnixNano() / int64(time.Millisecond)
+	start := time.Now()
 
-	/* spider := scraper.New()
-	spider.GetAllUrls() */
-	sw := scraper.NewSwitcher()
+	spider := scraper.New()
+	spider.GetAllUrls()
+	/* sw := scraper.NewSwitcher()
 	for i := 0; i < 5; i++ {
+		initConn := time.Now()
 		sw.RotateIP()
+		elapsedConn := time.Since(initConn)
+		fmt.Println("Tiempo en conectar:", elapsedConn)
 		time.Sleep(time.Duration(7 * time.Second))
-	}
+	} */
 
-	endTimer := time.Now().UnixNano() / int64(time.Millisecond)
-	fmt.Println("Tiempo")
-	fmt.Println("\tHoras:", (endTimer-initTimer)/int64(eqHours))
-	fmt.Println("\tMinutes:", (endTimer-initTimer)/int64(eqMinutes))
-	fmt.Println("\tSegundos:", (endTimer-initTimer)/int64(eqSeconds))
+	elapsed := time.Since(start)
+	fmt.Println("Tiempo:", elapsed)
 }
