@@ -19,6 +19,9 @@ func main() {
 		elapsedConn := time.Since(initConn)
 		fmt.Println("Tiempo en conectar:", elapsedConn)
 		time.Sleep(time.Duration(7 * time.Second))
+	}
+	if err := sw.Disconnect(); err != nil {
+		fmt.Println(err)
 	} */
 
 	elapsed := time.Since(start)

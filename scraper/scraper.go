@@ -75,6 +75,8 @@ func (s *Scraper) GetAllUrls() {
 		for key, value := range hds {
 			r.Headers.Set(key, value)
 		}
+		reqID := randomString()
+		r.Ctx.Put("RequestID", reqID)
 	})
 
 	// callback,para saber que pagina se ha visitado
@@ -168,4 +170,17 @@ func (s *Scraper) saveUrls(filePath string) error {
 		fmt.Fprintln(f, value)
 	}
 	return nil
+}
+
+func randomString() string {
+	rand.Seed(time.Now().UnixNano())
+	chars := []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZÅÄÖ" +
+		"abcdefghijklmnopqrstuvwxyzåäö" +
+		"0123456789")
+	length := 12
+	var b strings.Builder
+	for i := 0; i < length; i++ {
+		b.WriteRune(chars[rand.Intn(len(chars))])
+	}
+	return b.String()
 }
