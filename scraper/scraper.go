@@ -107,7 +107,7 @@ func (s *Scraper) GetAllUrls() {
 		RandomDelay: 300 * time.Second,
 	})
 
-	// callback
+	// Se ejecuta antes de realizar la solicitud
 	c.OnRequest(func(r *colly.Request) {
 		log.Printf("Visitando el sitio: %s\n", r.URL.String())
 		hds := headersPool[rand.Intn(len(headersPool))]
@@ -118,7 +118,18 @@ func (s *Scraper) GetAllUrls() {
 		r.Ctx.Put("RequestID", reqID)
 	})
 
-	// callback,para saber que pagina se ha visitado
+	// Se ejecuta si ocurre un error durante la petición
+	c.OnError(func(r *colly.Response, e error) {
+		log.Println("ERROR:", e, r.Request.URL, string(r.Body))
+	})
+
+	// Se ejecuta después de recibir la respuesta
+	c.OnResponse(func(r *colly.Response) {
+		log.Println("Página visitada", r.Request.URL)
+		log.Printf("Cookies de la petición: %+v\n", r.Request.Headers.Get("Cookie"))
+	})
+
+	// Se ejecuta justo después de OnResponse si el contenido recibido es HTML
 	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
 		link := e.Attr("href")
 		if link == "" {
@@ -142,24 +153,13 @@ func (s *Scraper) GetAllUrls() {
 		}
 	})
 
-	// callback
-	c.OnError(func(r *colly.Response, e error) {
-		log.Println("ERROR:", e, r.Request.URL, string(r.Body))
-	})
-
-	// callback, nos reponde con la pagina que ha visitando
-	c.OnResponse(func(r *colly.Response) {
-		log.Println("Página visitada", r.Request.URL)
-		log.Printf("Cookies de la petición: %+v\n", r.Request.Headers.Get("Cookie"))
-	})
-
+	// Es el último callback en ejecutarse
 	c.OnScraped(func(r *colly.Response) {
 		s.setSeedURL(r.Request.URL.String())
 	})
 
-	// sitio que vamos a visitar
+	// sitio inicial a visitar
 	c.Visit(s.seedURL)
-	log.Println("Despues de visit")
 	c.Wait()
 	log.Println("TERMINANDO EL SCRAPING")
 	log.Println("Escribiendo los resultados")
@@ -172,16 +172,13 @@ func (s *Scraper) GetAllUrls() {
 	}
 
 	filename, err := getFilePath("products.txt")
-
 	if err != nil {
 		log.Fatalf("Ocurrio un error al crear el archivo: %v", err)
 	}
-
 	err = s.saveUrls(filename)
 	if err != nil {
 		log.Fatalf("Ocurrio un error al escribir los elementos en el archivo: %v", err)
 	}
-
 	log.Printf("Archivo creado en %s\n", filename)
 }
 
