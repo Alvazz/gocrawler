@@ -12,17 +12,6 @@ func main() {
 
 	spider := scraper.New()
 	spider.GetAllUrls()
-	/* sw := scraper.NewSwitcher()
-	for i := 0; i < 5; i++ {
-		initConn := time.Now()
-		sw.RotateIP()
-		elapsedConn := time.Since(initConn)
-		fmt.Println("Tiempo en conectar:", elapsedConn)
-		time.Sleep(time.Duration(7 * time.Second))
-	}
-	if err := sw.Disconnect(); err != nil {
-		fmt.Println(err)
-	} */
 
 	elapsed := time.Since(start)
 	fmt.Println("Tiempo:", elapsed)

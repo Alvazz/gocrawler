@@ -7,10 +7,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gocolly/colly"
 	"github.com/gocolly/colly/extensions"
+	"github.com/joho/godotenv"
 )
 
 // httpHeader es el tipo de dato que contieee las cabeceras de las peticiones http de los sitios web.
@@ -32,13 +34,44 @@ var headersPool = headers{
 
 // Scraper es la clase para crear una instancia de la araña web
 type Scraper struct {
+	lock         *sync.RWMutex
+	seedURL      string
 	links        []string
 	productNames []string
 }
 
+//env es un map que contiene las variable de ambiente del archivo .env
+type enVars map[string]string
+
+var crawlerVars enVars = make(enVars)
+var envFilePath string
+
+func init() {
+	var err error
+	projectPath, ok := os.LookupEnv("PROJECTPATH")
+	if !ok {
+		log.Fatalf("%s not set\n", "PROJECTPATH")
+	} else {
+		log.Printf("%s=%s\n", "PROJECTPATH", projectPath)
+	}
+	envFilePath, err = filepath.Abs(filepath.Join(projectPath, "./.env"))
+	if err != nil {
+		log.Fatalf("Error al obtener l ruta del archivo .env: %v", err)
+	}
+	crawlerVars, err = godotenv.Read(envFilePath)
+	if err != nil {
+		log.Fatalf("Error al leer .env: %v", err)
+	}
+	log.Println("Archivo .env leido correctamente")
+}
+
 // New es el metodo que instancia la clase Scraper
 func New() *Scraper {
-	return &Scraper{}
+	log.Println(crawlerVars)
+	return &Scraper{
+		lock:    &sync.RWMutex{},
+		seedURL: crawlerVars["SEEDURL"],
+	}
 }
 
 // Links devuelve los enlaces obtenidos durante el raspado
@@ -47,12 +80,18 @@ func (s *Scraper) Links() []string { return s.links }
 // ProductNames devuelve los nombres de los productos obtenidos
 func (s *Scraper) ProductNames() []string { return s.productNames }
 
+func (s *Scraper) setSeedURL(url string) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.seedURL = url
+}
+
 // GetAllUrls inicia el rasapado de datos
 func (s *Scraper) GetAllUrls() {
 	log.Println("Comenzando")
 	c := colly.NewCollector(
 		colly.AllowedDomains("https://www.mixup.com.mx", "www.mixup.com.mx", "mixup.com.mx"),
-		colly.MaxDepth(5),
+		colly.MaxDepth(1),
 		colly.Async(true),
 		colly.UserAgent("Mozilla/5.0 (iPhone; CPU iPhone OS 12_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/69.0.3497.105 Mobile/15E148 Safari/605.1"),
 	)
@@ -114,12 +153,24 @@ func (s *Scraper) GetAllUrls() {
 		log.Printf("Cookies de la petición: %+v\n", r.Request.Headers.Get("Cookie"))
 	})
 
+	c.OnScraped(func(r *colly.Response) {
+		s.setSeedURL(r.Request.URL.String())
+	})
+
 	// sitio que vamos a visitar
-	c.Visit("https://www.mixup.com.mx")
+	c.Visit(s.seedURL)
 	log.Println("Despues de visit")
 	c.Wait()
 	log.Println("TERMINANDO EL SCRAPING")
 	log.Println("Escribiendo los resultados")
+
+	crawlerVars["SEEDURL"] = s.seedURL
+	log.Printf(".env filepath: %s", envFilePath)
+	err := godotenv.Write(crawlerVars, envFilePath)
+	if err != nil {
+		fmt.Printf("Error al escribir el archivo .env: %v", err)
+	}
+
 	filename, err := getFilePath("products.txt")
 
 	if err != nil {

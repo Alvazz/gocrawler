@@ -50,6 +50,10 @@ connect_to_vpn() {
 	done
 }
 
+if [ -z ${PROJECTPATH} ]; then
+  export PROJECTPATH=$(dirname ${BASH_SOURCE[0]})
+fi
+
 DEFAULT_IP=""
 test_connection DEFAULT_IP
 echo "IP DEFAULT: $DEFAULT_IP"
