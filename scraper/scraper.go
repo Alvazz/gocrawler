@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -94,11 +95,12 @@ func (s *Scraper) GetAllUrls() {
 		colly.MaxDepth(1),
 		colly.Async(true),
 		colly.UserAgent("Mozilla/5.0 (iPhone; CPU iPhone OS 12_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/69.0.3497.105 Mobile/15E148 Safari/605.1"),
+		colly.URLFilters(
+			regexp.MustCompile(`(?m)(?m)^(http(s)?:\/\/)?(w{3}?\.)?mixup(\.[\w\.-]+)+[\w\-\._~:/?#[\]@!\$&'\(\)\*\+,;=.]+$`),
+		),
 	)
 
 	extensions.Referer(c)
-
-	log.Println("Collector creado")
 
 	c.SetRequestTimeout(140 * time.Second)
 	c.Limit(&colly.LimitRule{
@@ -144,13 +146,9 @@ func (s *Scraper) GetAllUrls() {
 		}
 	})
 
-	c.OnHTML(".titulo", func(e *colly.HTMLElement) {
-		title := strings.TrimSpace(e.Text)
-		if title == "" {
-			log.Println("No se encontró el título")
-		} else {
-			s.productNames = append(s.productNames, title)
-		}
+	c.OnHTML(`meta[name="Keywords"]`, func(e *colly.HTMLElement) {
+		metaKeywords := e.Attr("content")
+		log.Printf("Keywords de la peticion %s: %v", e.Request.URL.String(), metaKeywords)
 	})
 
 	// Es el último callback en ejecutarse
@@ -220,6 +218,7 @@ func (s *Scraper) saveUrls(filePath string) error {
 	return nil
 }
 
+// randomString genera una cadena de caracteres aleatorios
 func randomString() string {
 	rand.Seed(time.Now().UnixNano())
 	chars := []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZÅÄÖ" +

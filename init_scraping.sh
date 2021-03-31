@@ -30,8 +30,8 @@ connect_to_vpn() {
 			test_connection IP_VPN
 			echo $IP_VPN
 		done
-        echo "Conectado a $CURRENT_CONFIG"
-        sleep 3
+		echo "Conectado a $CURRENT_CONFIG"
+		sleep 3
 		clear
 		crawler
 
@@ -44,19 +44,18 @@ connect_to_vpn() {
 			test_connection IP_VPN
 			echo $IP_VPN
 		done
-        echo "Desconectado de $CURRENT_CONFIG"
-        sleep 3
+		echo "Desconectado de $CURRENT_CONFIG"
+		sleep 3
 		clear
 	done
 }
 
 if [ -z ${PROJECTPATH} ]; then
-  export PROJECTPATH=$(dirname ${BASH_SOURCE[0]})
+	export PROJECTPATH=$(dirname ${BASH_SOURCE[0]})
 fi
 
 DEFAULT_IP=""
 test_connection DEFAULT_IP
 echo "IP DEFAULT: $DEFAULT_IP"
 connect_to_vpn
-echo "IP_VPN: $IP_VPN IP: $IP"
 
