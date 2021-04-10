@@ -1,13 +1,13 @@
-package shop
+package scraper
 
 import (
 	"github.com/gocolly/colly"
 )
 
-type ShopCrawler interface {
+type shopCrawler interface {
 	GetMetaTags(*colly.HTMLElement)
-	GetProductData(*colly.HTMLElement)
-	GetProductDetails(*colly.HTMLElement)
+	GetProductDetails(*colly.HTMLElement, *Scraper)
+	GetLinkExtractionQuery() string
 }
 
 type shop struct {

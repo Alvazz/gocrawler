@@ -1,6 +1,7 @@
 package scraper
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -15,7 +16,6 @@ import (
 	"github.com/gocolly/colly/extensions"
 	"github.com/joho/godotenv"
 	"github.com/leosykes117/gocrawler/logging"
-	"github.com/leosykes117/gocrawler/scraper/shop"
 	"github.com/segmentio/ksuid"
 )
 
@@ -34,14 +34,15 @@ var (
 	envFilePath string
 )
 
+type products []*Item
+
 // Scraper es la clase para crear una instancia de la araña web
 type Scraper struct {
-	lock         *sync.RWMutex
-	visitsCount  uint
-	seedURL      string
-	requests     scrapingRequests
-	links        []string
-	productNames []string
+	lock             *sync.RWMutex
+	visitsCount      uint
+	seedURL          string
+	requests         scrapingRequests
+	acquiredProducts products
 }
 
 func init() {
@@ -68,18 +69,13 @@ func init() {
 func New() *Scraper {
 	logging.InfoLogger.Println(crawlerVars)
 	return &Scraper{
-		lock:        &sync.RWMutex{},
-		visitsCount: 0,
-		seedURL:     crawlerVars["SEEDURL"],
-		requests:    make(scrapingRequests, 0),
+		lock:             &sync.RWMutex{},
+		visitsCount:      0,
+		seedURL:          crawlerVars["SEEDURL"],
+		requests:         make(scrapingRequests, 0),
+		acquiredProducts: make(products, 0),
 	}
 }
-
-// Links devuelve los enlaces obtenidos durante el raspado
-func (s *Scraper) Links() []string { return s.links }
-
-// ProductNames devuelve los nombres de los productos obtenidos
-func (s *Scraper) ProductNames() []string { return s.productNames }
 
 // setSeedURL utiliza un Mutex para guardar la última url visitada
 func (s *Scraper) setSeedURL(url string) {
@@ -97,11 +93,11 @@ func (s *Scraper) addRequest(rt *requestTracker) {
 
 // GetAllUrls inicia el rasapado de datos
 func (s *Scraper) GetAllUrls() {
-	shopCrawler := shop.NewShopMixup()
+	var shop shopCrawler = newShopMixup()
 
 	c := colly.NewCollector(
 		colly.AllowedDomains("https://www.mixup.com.mx", "www.mixup.com.mx", "mixup.com.mx"),
-		colly.MaxDepth(1),
+		//colly.MaxDepth(8),
 		colly.Async(true),
 		colly.UserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X x.y; rv:42.0) Gecko/20100101 Firefox/42.0"),
 	)
@@ -175,23 +171,17 @@ func (s *Scraper) GetAllUrls() {
 	c.OnResponse(func(r *colly.Response) {
 		logging.InfoLogger.Println("Verificando si el response es una imagen")
 		if strings.Index(r.Headers.Get("Content-Type"), "image") > -1 {
-			logging.InfoLogger.Println("Imagen obtenida")
-			imgFileName, err := getFilePath(r.FileName())
-			if err != nil {
-				logging.ErrorLogger.Printf("Ocurrio un erro al obtener la ruta para guardar la imagen: %v", err)
-			} else {
-				r.Save(imgFileName)
-			}
+			logging.InfoLogger.Printf("Imagen obtenida[%s]", r.Request.Ctx.Get("ID"))
 		}
 	})
 
 	// Se ejecuta justo después de OnResponse si el contenido recibido es HTML
-	c.OnHTML(".itemlist.category a[href]", func(e *colly.HTMLElement) {
+	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
 		link := e.Attr("href")
 		if link == "" {
 			logging.WarningLogger.Println("No se encontro el link")
 		} else {
-			re := regexp.MustCompile(shopCrawler.GetCategoryLinkPattern())
+			re := regexp.MustCompile(shop.GetLinkExtractionQuery())
 			if !re.MatchString(link) && !strings.Contains(link, "?sku=") {
 				logging.WarningLogger.Printf("La URL no cumple las reglas para ser visitada: %s", link)
 			} else {
@@ -200,13 +190,17 @@ func (s *Scraper) GetAllUrls() {
 					logging.ErrorLogger.Println("SET COOKIES ERROR: ", err)
 				}
 				s.visitsCount++
-				//c.Visit(e.Request.AbsoluteURL(link))
+				c.Visit(e.Request.AbsoluteURL(link))
 			}
 		}
 	})
 
-	c.OnHTML("html", shopCrawler.GetMetaTags)
-	c.OnHTML("div.detail", shopCrawler.GetProductDetails)
+	c.OnHTML("html", shop.GetMetaTags)
+	c.OnHTML("div.detail", func(e *colly.HTMLElement) {
+		if strings.Contains(e.Request.URL.RawQuery, "sku=") {
+			shop.GetProductDetails(e, s)
+		}
+	})
 
 	// Es el último callback en ejecutarse
 	c.OnScraped(func(r *colly.Response) {
@@ -226,11 +220,11 @@ func (s *Scraper) GetAllUrls() {
 		fmt.Printf("Error al escribir el archivo .env: %v", err)
 	}
 
-	filename, err := getFilePath("products.txt")
+	filename, err := getFilePath("products.json")
 	if err != nil {
 		logging.ErrorLogger.Fatalf("Ocurrio un error al crear el archivo: %v", err)
 	}
-	err = s.saveUrls(filename)
+	err = s.saveProducts(filename)
 	if err != nil {
 		logging.ErrorLogger.Fatalf("Ocurrio un error al escribir los elementos en el archivo: %v", err)
 	}
@@ -244,7 +238,7 @@ func (s *Scraper) GetAllUrls() {
 	if err != nil {
 		logging.ErrorLogger.Fatalf("Ocurrio un error al crear la ruta del archivo json: %v", err)
 	}
-	err = ioutil.WriteFile(jsonFile, requestsJSON, 0644)
+	err = ioutil.WriteFile(jsonFile, requestsJSON, 0600)
 	if err != nil {
 		logging.ErrorLogger.Fatalf("Ocurrio un error al crear el archivo json: %v", err)
 	}
@@ -276,15 +270,20 @@ func getFilePath(filename string) (string, error) {
 }
 
 // saveUrls escribe en un archivo los productos obtenidos
-func (s *Scraper) saveUrls(filePath string) error {
-	if len(s.productNames) > 0 {
+func (s *Scraper) saveProducts(filePath string) error {
+	if len(s.acquiredProducts) > 0 {
 		f, err := os.Create(filePath)
 		if err != nil {
 			return err
 		}
 		defer f.Close()
-		for _, value := range s.productNames {
-			fmt.Fprintln(f, value)
+		jsonProducts, err := json.MarshalIndent(s.acquiredProducts, "", "\t")
+		if err != nil {
+			return err
+		}
+		_, err = f.Write(jsonProducts)
+		if err != nil {
+			return err
 		}
 	}
 	return nil
