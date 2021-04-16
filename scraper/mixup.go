@@ -21,7 +21,9 @@ func newShopMixup() *mixup {
 			topLevelDomain:      "mixup.com",
 			keywordsValue:       "Keywords",
 			descriptionValue:    "Description",
-			linkExtractionQuery: `(?m)(Categoria|Productos).aspx\?(etq\=)`,
+			linkExtractionQuery: `(?m)https://www\.mixup\.com\.mx/[Mm]ixup/(([Hh]ome\.aspx)|((Categoria|Productos)\.aspx\?(etq\=))|(detproducto\.aspx\?sku=\d{12})$)`,
+			linkProductQuery:    `(?m)(https://www\.mixup\.com\.mx/[Mm]ixup/)(detproducto\.aspx\?sku=\d{12,})$`,
+			//linkExtractionQuery: `(?m)(https://www\.mixup\.com\.mx/[Mm]ixup/)(Categoria|Productos)\.aspx\?(etq\=)`,
 		},
 	}
 }

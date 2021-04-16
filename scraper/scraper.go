@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -100,16 +102,30 @@ func (s *Scraper) GetAllUrls() {
 		//colly.MaxDepth(8),
 		colly.Async(true),
 		colly.UserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X x.y; rv:42.0) Gecko/20100101 Firefox/42.0"),
+		colly.URLFilters(
+			regexp.MustCompile(shop.GetLinkExtractionQuery()),
+		),
 	)
 
 	extensions.Referer(c)
 
-	c.SetRequestTimeout(100 * time.Second)
-	c.Limit(&colly.LimitRule{
-		Parallelism: 2,
-		Delay:       90 * time.Second,
-		RandomDelay: 110 * time.Second,
+	c.SetRequestTimeout(30 * time.Second)
+
+	c.WithTransport(&http.Transport{
+		Dial: (&net.Dialer{
+			Timeout: 30 * time.Second,
+		}).Dial,
+		TLSHandshakeTimeout: 30 * time.Second,
 	})
+
+	err := c.Limit(&colly.LimitRule{
+		DomainGlob:  `*mixup.*`,
+		Parallelism: 2,
+		RandomDelay: 6 * time.Second,
+	})
+	if err != nil {
+		logging.ErrorLogger.Printf("Ocurrio un error al establecer los limites para el colector: %v", err)
+	}
 
 	// Se ejecuta antes de realizar la solicitud
 	c.OnRequest(func(r *colly.Request) {
@@ -147,6 +163,12 @@ func (s *Scraper) GetAllUrls() {
 
 	// Se ejecuta después de recibir la respuesta
 	c.OnResponse(func(r *colly.Response) {
+		re := regexp.MustCompile(shop.GetLinkExtractionQuery())
+		url := r.Request.URL.String()
+		if !re.MatchString(url) && !strings.Contains(url, "?sku=") {
+			logging.WarningLogger.Printf("La URL no cumple las reglas para ser visitada: %s", url)
+			return
+		}
 		reqID := r.Ctx.Get("ID")
 		strStartAt := r.Ctx.Get("StartAt")
 		timeStartAt, err := time.Parse(time.UnixDate, strStartAt)
@@ -164,15 +186,7 @@ func (s *Scraper) GetAllUrls() {
 			nil,
 		)
 		s.addRequest(rt)
-		//log.Println("Página visitada", r.Request.URL)
 		logging.InfoLogger.Printf("OnResponse:\n\tID: %s,\nStartAt: %s", r.Ctx.Get("ID"), strStartAt)
-	})
-
-	c.OnResponse(func(r *colly.Response) {
-		logging.InfoLogger.Println("Verificando si el response es una imagen")
-		if strings.Index(r.Headers.Get("Content-Type"), "image") > -1 {
-			logging.InfoLogger.Printf("Imagen obtenida[%s]", r.Request.Ctx.Get("ID"))
-		}
 	})
 
 	// Se ejecuta justo después de OnResponse si el contenido recibido es HTML
@@ -182,15 +196,17 @@ func (s *Scraper) GetAllUrls() {
 			logging.WarningLogger.Println("No se encontro el link")
 		} else {
 			re := regexp.MustCompile(shop.GetLinkExtractionQuery())
-			if !re.MatchString(link) && !strings.Contains(link, "?sku=") {
+			if !re.MatchString(link) {
 				logging.WarningLogger.Printf("La URL no cumple las reglas para ser visitada: %s", link)
-			} else {
-				siteCookies := c.Cookies(link)
-				if err := c.SetCookies(link, siteCookies); err != nil {
-					logging.ErrorLogger.Println("SET COOKIES ERROR: ", err)
-				}
-				s.visitsCount++
-				c.Visit(e.Request.AbsoluteURL(link))
+			}
+			siteCookies := c.Cookies(link)
+			if err := c.SetCookies(link, siteCookies); err != nil {
+				logging.ErrorLogger.Println("SET COOKIES ERROR: ", err)
+			}
+			s.visitsCount++
+			err := c.Visit(e.Request.AbsoluteURL(link))
+			if err != nil {
+				logging.ErrorLogger.Printf("[%s][%s]Ocurrio un error al crear la petición: %v", e.Request.Ctx.Get("ID"), e.Request.AbsoluteURL(link), err)
 			}
 		}
 	})
@@ -209,13 +225,16 @@ func (s *Scraper) GetAllUrls() {
 
 	// sitio inicial a visitar
 	s.visitsCount++
-	c.Visit(s.seedURL)
+	err = c.Visit(s.seedURL)
+	if err != nil {
+		logging.ErrorLogger.Printf("Ocurrio un error al crear la petición de la URL semilla: %v", err)
+	}
 	c.Wait()
 	logging.InfoLogger.Println("Escribiendo los resultados")
 
 	crawlerVars["SEEDURL"] = s.seedURL
 	logging.InfoLogger.Printf(".env filepath: %s", envFilePath)
-	err := godotenv.Write(crawlerVars, envFilePath)
+	err = godotenv.Write(crawlerVars, envFilePath)
 	if err != nil {
 		fmt.Printf("Error al escribir el archivo .env: %v", err)
 	}
