@@ -1,6 +1,7 @@
 package scraper
 
 import (
+	"context"
 	"time"
 )
 
@@ -18,6 +19,10 @@ type ProductDetails map[string]string
 
 // Item es la estructura que representa un producto.
 type Item struct {
+	// ID es el identificador del producto.
+	// Es el SHA1 formado por la cadena "`Nombre del Producto`,`TIENDA DE PROCEDENCIA`\SKU"
+	ID string
+
 	// Name es el nombre del producto.
 	Name string
 
@@ -44,6 +49,8 @@ type Item struct {
 	Details ProductDetails
 }
 
+type Items []*Item
+
 func NewItem(name, brand, description, sourceStore, url string, rating Score, reviews Comments, details ProductDetails) *Item {
 	return &Item{
 		Name:        name,
@@ -55,4 +62,11 @@ func NewItem(name, brand, description, sourceStore, url string, rating Score, re
 		URL:         url,
 		Details:     details,
 	}
+}
+
+type Repository interface {
+	// CreateGopher saves a given gopher
+	CreateItem(context.Context, *Item) error
+	//
+	FetchItemID(context.Context, string) (*Item, error)
 }

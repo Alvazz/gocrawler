@@ -22,21 +22,9 @@ import (
 )
 
 var (
-	headersPool = headers{
-		{
-			"DNT":             "1",
-			"Accept":          "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
-			"Accept-Encoding": "gzip, deflate, br",
-			"Accept-Language": "es-US,es-419;q=0.9,es;q=0.8,en;q=0.7",
-			"Cache-Control":   "max-age=0",
-			"Connection":      "keep-alive",
-		},
-	}
 	crawlerVars enVars = make(enVars)
 	envFilePath string
 )
-
-type products []*Item
 
 // Scraper es la clase para crear una instancia de la araña web
 type Scraper struct {
@@ -44,27 +32,12 @@ type Scraper struct {
 	visitsCount      uint
 	seedURL          string
 	requests         scrapingRequests
-	acquiredProducts products
+	acquiredProducts Items
 }
 
 func init() {
 	logging.InitLogging()
-	var err error
-	projectPath, ok := os.LookupEnv("PROJECTPATH")
-	if !ok {
-		logging.ErrorLogger.Fatalf("%s not set\n", "PROJECTPATH")
-	} else {
-		logging.InfoLogger.Printf("%s=%s\n", "PROJECTPATH", projectPath)
-	}
-	envFilePath, err = filepath.Abs(filepath.Join(projectPath, "./.env"))
-	if err != nil {
-		logging.ErrorLogger.Fatalf("Error al obtener l ruta del archivo .env: %v", err)
-	}
-	crawlerVars, err = godotenv.Read(envFilePath)
-	if err != nil {
-		logging.ErrorLogger.Fatalf("Error al leer .env: %v", err)
-	}
-	logging.InfoLogger.Println("Archivo .env leido correctamente")
+	ReadEnVars()
 }
 
 // New es el metodo que instancia la clase Scraper
@@ -75,7 +48,7 @@ func New() *Scraper {
 		visitsCount:      0,
 		seedURL:          crawlerVars["SEEDURL"],
 		requests:         make(scrapingRequests, 0),
-		acquiredProducts: make(products, 0),
+		acquiredProducts: make(Items, 0),
 	}
 }
 
@@ -131,7 +104,7 @@ func (s *Scraper) GetAllUrls() {
 	c.OnRequest(func(r *colly.Request) {
 		reqID, _ := ksuid.NewRandom()
 		logging.InfoLogger.Printf("[%s]Visitando el sitio: %s\n", reqID.String(), r.URL.String())
-		hds := headersPool[rand.Intn(len(headersPool))]
+		hds := GetHeaders()
 		for key, value := range hds {
 			r.Headers.Set(key, value)
 		}

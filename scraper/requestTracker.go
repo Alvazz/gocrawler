@@ -10,15 +10,6 @@ import (
 	"github.com/hako/durafmt"
 )
 
-// httpHeader es el tipo de dato que contieee las cabeceras de las peticiones http de los sitios web.
-type httpHeaders map[string]string
-
-// headers lista de httpHeader
-type headers []httpHeaders
-
-//env es un map que contiene las variable de ambiente del archivo .env
-type enVars map[string]string
-
 // requestTracker es la estructura que tiene los datos de toda la petición que realiza el Scraper
 type requestTracker struct {
 	id           string
