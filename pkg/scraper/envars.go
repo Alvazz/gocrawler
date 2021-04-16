@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/joho/godotenv"
-	"github.com/leosykes117/gocrawler/logging"
+	"github.com/leosykes117/gocrawler/pkg/logging"
 )
 
 //env es un map que contiene las variable de ambiente del archivo .env

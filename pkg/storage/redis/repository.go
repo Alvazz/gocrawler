@@ -6,7 +6,7 @@ import (
 	"errors"
 
 	"github.com/gomodule/redigo/redis"
-	"github.com/leosykes117/gocrawler/scraper"
+	"github.com/leosykes117/gocrawler/pkg/scraper"
 	_ "github.com/lib/pq"
 )
 

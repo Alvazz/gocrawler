@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/gocolly/colly"
-	"github.com/leosykes117/gocrawler/logging"
+	"github.com/leosykes117/gocrawler/pkg/logging"
 )
 
 type mixup struct {

@@ -17,7 +17,7 @@ import (
 	"github.com/gocolly/colly"
 	"github.com/gocolly/colly/extensions"
 	"github.com/joho/godotenv"
-	"github.com/leosykes117/gocrawler/logging"
+	"github.com/leosykes117/gocrawler/pkg/logging"
 	"github.com/segmentio/ksuid"
 )
 
