@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/gocolly/colly"
+	"github.com/leosykes117/gocrawler/pkg/item"
 	"github.com/leosykes117/gocrawler/pkg/logging"
 )
 
@@ -52,9 +53,9 @@ func (m *mixup) GetProductDetails(e *colly.HTMLElement, s *Scraper) {
 	var (
 		detailCount                                int = 0
 		name, brand, description, sourceStore, url string
-		rating                                     Score
-		reviews                                    Comments       = make(Comments, 0)
-		details                                    ProductDetails = make(ProductDetails)
+		rating                                     item.Score
+		reviews                                    item.Comments       = make(item.Comments, 0)
+		details                                    item.ProductDetails = make(item.ProductDetails)
 	)
 	reqID := e.Request.Ctx.Get("ID")
 	sourceStore = "Mixup"
@@ -89,7 +90,7 @@ func (m *mixup) GetProductDetails(e *colly.HTMLElement, s *Scraper) {
 	description = e.DOM.Parent().NextAllFiltered("div.productcontent").Find("div#tabs-res").Text()
 	description = strings.TrimSpace(description)
 
-	s.acquiredProducts = append(s.acquiredProducts, NewItem(
+	s.acquiredProducts = append(s.acquiredProducts, item.NewItem(
 		name,
 		brand,
 		description,

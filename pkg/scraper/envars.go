@@ -1,6 +1,7 @@
 package scraper
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -11,21 +12,22 @@ import (
 //env es un map que contiene las variable de ambiente del archivo .env
 type enVars map[string]string
 
-func ReadEnVars() {
+func ReadEnVars() (enVars, string, error) {
 	var err error
 	projectPath, ok := os.LookupEnv("PROJECTPATH")
 	if !ok {
-		logging.ErrorLogger.Fatalf("%s not set\n", "PROJECTPATH")
+		return nil, "", fmt.Errorf("%s not set\n", "PROJECTPATH")
 	} else {
 		logging.InfoLogger.Printf("%s=%s\n", "PROJECTPATH", projectPath)
 	}
-	envFilePath, err = filepath.Abs(filepath.Join(projectPath, "./.env"))
+	envFile, err := filepath.Abs(filepath.Join(projectPath, "./.env"))
 	if err != nil {
-		logging.ErrorLogger.Fatalf("Error al obtener l ruta del archivo .env: %v", err)
+		return nil, "", fmt.Errorf("Error al obtener l ruta del archivo .env: %v", err)
 	}
-	crawlerVars, err = godotenv.Read(envFilePath)
+	vars, err := godotenv.Read(envFile)
 	if err != nil {
-		logging.ErrorLogger.Fatalf("Error al leer .env: %v", err)
+		return nil, "", fmt.Errorf("Error al leer .env: %v", err)
 	}
 	logging.InfoLogger.Println("Archivo .env leido correctamente")
+	return vars, envFile, nil
 }

@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/hako/durafmt"
-	"github.com/leosykes117/gocrawler/scraper"
+	"github.com/leosykes117/gocrawler/pkg/scraper"
 )
 
 func main() {

@@ -1,8 +1,11 @@
-package scraper
+package item
 
 import (
 	"context"
+	"fmt"
 	"time"
+
+	"github.com/leosykes117/gocrawler/pkg/ciphersuite"
 )
 
 type Comment struct {
@@ -20,7 +23,7 @@ type ProductDetails map[string]string
 // Item es la estructura que representa un producto.
 type Item struct {
 	// ID es el identificador del producto.
-	// Es el SHA1 formado por la cadena "`Nombre del Producto`,`TIENDA DE PROCEDENCIA`\SKU"
+	// Es el SHA1 formado por la cadena "`Nombre del Producto`/`TIENDA DE PROCEDENCIA`/`SKU`"
 	ID string
 
 	// Name es el nombre del producto.
@@ -52,7 +55,9 @@ type Item struct {
 type Items []*Item
 
 func NewItem(name, brand, description, sourceStore, url string, rating Score, reviews Comments, details ProductDetails) *Item {
+	id, _ := ciphersuite.GetMD5Hash(fmt.Sprintf("%s/%s", name, sourceStore))
 	return &Item{
+		ID:          id,
 		Name:        name,
 		Brand:       brand,
 		Description: description,

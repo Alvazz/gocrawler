@@ -17,8 +17,9 @@ import (
 	"github.com/gocolly/colly"
 	"github.com/gocolly/colly/extensions"
 	"github.com/joho/godotenv"
+	"github.com/leosykes117/gocrawler/pkg/ciphersuite"
+	"github.com/leosykes117/gocrawler/pkg/item"
 	"github.com/leosykes117/gocrawler/pkg/logging"
-	"github.com/segmentio/ksuid"
 )
 
 var (
@@ -32,12 +33,16 @@ type Scraper struct {
 	visitsCount      uint
 	seedURL          string
 	requests         scrapingRequests
-	acquiredProducts Items
+	acquiredProducts item.Items
 }
 
 func init() {
+	var err error
 	logging.InitLogging()
-	ReadEnVars()
+	crawlerVars, envFilePath, err = ReadEnVars()
+	if err != nil {
+		logging.ErrorLogger.Fatalln(err)
+	}
 }
 
 // New es el metodo que instancia la clase Scraper
@@ -48,7 +53,7 @@ func New() *Scraper {
 		visitsCount:      0,
 		seedURL:          crawlerVars["SEEDURL"],
 		requests:         make(scrapingRequests, 0),
-		acquiredProducts: make(Items, 0),
+		acquiredProducts: make(item.Items, 0),
 	}
 }
 
@@ -93,7 +98,7 @@ func (s *Scraper) GetAllUrls() {
 
 	err := c.Limit(&colly.LimitRule{
 		DomainGlob:  `*mixup.*`,
-		Parallelism: 2,
+		Parallelism: 4,
 		RandomDelay: 6 * time.Second,
 	})
 	if err != nil {
@@ -102,13 +107,13 @@ func (s *Scraper) GetAllUrls() {
 
 	// Se ejecuta antes de realizar la solicitud
 	c.OnRequest(func(r *colly.Request) {
-		reqID, _ := ksuid.NewRandom()
-		logging.InfoLogger.Printf("[%s]Visitando el sitio: %s\n", reqID.String(), r.URL.String())
+		reqID, _ := ciphersuite.GetMD5Hash(r.URL.String())
+		logging.InfoLogger.Printf("[%s]Visitando el sitio: %s\n", reqID, r.URL.String())
 		hds := GetHeaders()
 		for key, value := range hds {
 			r.Headers.Set(key, value)
 		}
-		r.Ctx.Put("ID", reqID.String())
+		r.Ctx.Put("ID", reqID)
 		r.Ctx.Put("StartAt", time.Now().Format(time.UnixDate))
 	})
 
@@ -277,6 +282,13 @@ func (s *Scraper) saveProducts(filePath string) error {
 		if err != nil {
 			return err
 		}
+
+		/* repo := redis.NewRepository(redis.NewConn(crawlerVars["REDIS_ENDPOINT"]))
+		for _, product := range s.acquiredProducts {
+			if err := repo.CreateItem(context.Background(), product); err != nil {
+				logging.ErrorLogger.Fatalf("Ocurrio un error al guardar el producto %s: %v", product.ID, err)
+			}
+		} */
 	}
 	return nil
 }
