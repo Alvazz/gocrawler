@@ -24,10 +24,9 @@ func NewRepository(pool *redis.Pool) *itemRepository {
 }
 
 func (r *itemRepository) CreateItem(ctx context.Context, item *item.Item) error {
-	conn, err := r.pool.GetContext(ctx)
-	if err != nil {
-		return err
-	}
+	var err error
+	conn := r.pool.Get()
+	defer r.pool.Close()
 
 	productKey := fmt.Sprintf("product:%s", item.ID)
 	commentsKey := fmt.Sprintf("comments:%s", item.ID)
@@ -59,7 +58,7 @@ func (r *itemRepository) CreateItem(ctx context.Context, item *item.Item) error 
 	}
 
 	// ALMACENA EL MAP DE LOS DETALLES DEL PRODUCTO
-	for k, v := range item.Description {
+	for k, v := range item.Details {
 		err = conn.Send("HSETNX", detailsKey, k, v)
 		if err != nil {
 			return err

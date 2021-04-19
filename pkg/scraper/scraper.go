@@ -1,6 +1,7 @@
 package scraper
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -20,6 +21,7 @@ import (
 	"github.com/leosykes117/gocrawler/pkg/ciphersuite"
 	"github.com/leosykes117/gocrawler/pkg/item"
 	"github.com/leosykes117/gocrawler/pkg/logging"
+	"github.com/leosykes117/gocrawler/pkg/storage/redis"
 )
 
 var (
@@ -283,12 +285,12 @@ func (s *Scraper) saveProducts(filePath string) error {
 			return err
 		}
 
-		/* repo := redis.NewRepository(redis.NewConn(crawlerVars["REDIS_ENDPOINT"]))
+		repo := redis.NewRepository(redis.NewConn(crawlerVars["REDIS_ENDPOINT"]))
 		for _, product := range s.acquiredProducts {
 			if err := repo.CreateItem(context.Background(), product); err != nil {
 				logging.ErrorLogger.Fatalf("Ocurrio un error al guardar el producto %s: %v", product.ID, err)
 			}
-		} */
+		}
 	}
 	return nil
 }
