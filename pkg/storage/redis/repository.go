@@ -38,7 +38,7 @@ func (r *itemRepository) CreateItem(ctx context.Context, item *item.Item) error 
 		return err
 	}
 	// SE CREA EL HASH PRINCIPAL PARA ALMACENAR EL PRODUCTO
-	err = conn.Send("HMSET", productKey, "id", item.ID, "name", item.Name, "brand", item.Brand, "description", item.Description, "score", item.Rating, "reviews", commentsKey, "sourceStore", item.SourceStore, "details", detailsKey)
+	err = conn.Send("HMSET", productKey, "id", item.ID, "name", item.Name, "brand", item.Brand, "description", item.Description, "score", item.Rating, "reviews", commentsKey, "sourceStore", item.SourceStore, "url", item.URL, "details", detailsKey)
 	if err != nil {
 		return err
 	}
