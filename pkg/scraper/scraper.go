@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -128,17 +129,19 @@ func (s *Scraper) GetAllUrls() {
 			logging.WarningLogger.Printf("Error al parsear la fecha: %v", err)
 		}
 		logging.ErrorLogger.Printf("OnError:%s\n\tID: %s,\n\tStartAt: %s", e, r.Ctx.Get("ID"), strStartAt)
-		rt := newRequestTracker(
-			reqID,
-			r.Request.AbsoluteURL(r.Request.URL.String()),
-			"OnError",
-			r.Request,
-			r,
-			timeStartAt,
-			time.Now(),
-			e,
-		)
-		s.addRequest(rt)
+		if ok, _ := strconv.ParseBool(crawlerVars["REQUEST_DEBUG"]); ok {
+			rt := newRequestTracker(
+				reqID,
+				r.Request.AbsoluteURL(r.Request.URL.String()),
+				"OnError",
+				r.Request,
+				r,
+				timeStartAt,
+				time.Now(),
+				e,
+			)
+			s.addRequest(rt)
+		}
 	})
 
 	// Se ejecuta después de recibir la respuesta
@@ -155,17 +158,19 @@ func (s *Scraper) GetAllUrls() {
 		if err != nil {
 			logging.WarningLogger.Printf("Error al parsear la fecha: %v", err)
 		}
-		rt := newRequestTracker(
-			reqID,
-			r.Request.AbsoluteURL(r.Request.URL.String()),
-			"OnResponse",
-			r.Request,
-			r,
-			timeStartAt,
-			time.Now(),
-			nil,
-		)
-		s.addRequest(rt)
+		if ok, _ := strconv.ParseBool(crawlerVars["REQUEST_DEBUG"]); ok {
+			rt := newRequestTracker(
+				reqID,
+				r.Request.AbsoluteURL(r.Request.URL.String()),
+				"OnResponse",
+				r.Request,
+				r,
+				timeStartAt,
+				time.Now(),
+				nil,
+			)
+			s.addRequest(rt)
+		}
 		logging.InfoLogger.Printf("OnResponse:\n\tID: %s,\nStartAt: %s", r.Ctx.Get("ID"), strStartAt)
 	})
 
@@ -175,6 +180,7 @@ func (s *Scraper) GetAllUrls() {
 		if link == "" {
 			logging.WarningLogger.Println("No se encontro el link")
 		} else {
+			link = e.Request.AbsoluteURL(link)
 			re := regexp.MustCompile(shop.GetLinkExtractionQuery())
 			if !re.MatchString(link) {
 				logging.WarningLogger.Printf("La URL no cumple las reglas para ser visitada: %s", link)
@@ -184,7 +190,7 @@ func (s *Scraper) GetAllUrls() {
 				logging.ErrorLogger.Println("SET COOKIES ERROR: ", err)
 			}
 			s.visitsCount++
-			err := c.Visit(e.Request.AbsoluteURL(link))
+			err := c.Visit(link)
 			if err != nil {
 				logging.ErrorLogger.Printf("[%s][%s]Ocurrio un error al crear la petición: %v", e.Request.Ctx.Get("ID"), e.Request.AbsoluteURL(link), err)
 			}

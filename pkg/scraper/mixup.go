@@ -1,12 +1,14 @@
 package scraper
 
 import (
+	"context"
 	"regexp"
 	"strings"
 
 	"github.com/gocolly/colly"
 	"github.com/leosykes117/gocrawler/pkg/item"
 	"github.com/leosykes117/gocrawler/pkg/logging"
+	"github.com/leosykes117/gocrawler/pkg/storage/redis"
 )
 
 type mixup struct {
@@ -90,7 +92,7 @@ func (m *mixup) GetProductDetails(e *colly.HTMLElement, s *Scraper) {
 	description = e.DOM.Parent().NextAllFiltered("div.productcontent").Find("div#tabs-res").Text()
 	description = strings.TrimSpace(description)
 
-	s.acquiredProducts = append(s.acquiredProducts, item.NewItem(
+	product := item.NewItem(
 		name,
 		brand,
 		description,
@@ -99,7 +101,23 @@ func (m *mixup) GetProductDetails(e *colly.HTMLElement, s *Scraper) {
 		rating,
 		reviews,
 		details,
-	))
+	)
+
+	repo := redis.NewRepository(redis.NewConn(crawlerVars["REDIS_ENDPOINT"]))
+	if err := repo.CreateItem(context.Background(), product); err != nil {
+		logging.ErrorLogger.Fatalf("Ocurrio un error al guardar el producto %s: %v", product.ID, err)
+	}
+
+	/* s.acquiredProducts = append(s.acquiredProducts, item.NewItem(
+		name,
+		brand,
+		description,
+		sourceStore,
+		url,
+		rating,
+		reviews,
+		details,
+	)) */
 }
 
 /* func (m *mixup) GetProductData(e *colly.HTMLElement) {
