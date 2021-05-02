@@ -103,5 +103,9 @@ $RECYCLE.BIN/
 
 # End of https://www.toptal.com/developers/gitignore/api/go,macos,windows,linux,vscode
 
-#PROJECT IGNORES
-bin/
+# PROJECT IGNORES
+bin/*
+*.env
+
+# Kepp all files .gitkeep
+!*/.gitkeep

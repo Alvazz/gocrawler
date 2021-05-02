@@ -22,7 +22,7 @@ func ReadEnVars() (enVars, string, error) {
 	}
 	envFile, err := filepath.Abs(filepath.Join(projectPath, "./.env"))
 	if err != nil {
-		return nil, "", fmt.Errorf("Error al obtener l ruta del archivo .env: %v", err)
+		return nil, "", fmt.Errorf("Error al obtener la ruta del archivo .env: %v", err)
 	}
 	vars, err := godotenv.Read(envFile)
 	if err != nil {
