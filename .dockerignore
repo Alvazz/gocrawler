@@ -1,8 +1,12 @@
-.git
-.gitignore
-Dockerfile
-.DS_Store
-README.md
-Makefile
+# Ignora todo
+**
 
-bin/
+# Permite los archivos y directorios
+!.env
+!pkg
+!bin
+!*.go
+!go.*
+
+# Ignora todos los archivos que haya dentro de la carpeta bin
+**bin/*

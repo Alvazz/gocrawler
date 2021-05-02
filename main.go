@@ -1,17 +1,17 @@
 package main
 
 import (
-	"log"
+	"fmt"
 	"time"
 
-	"github.com/leosykes117/gocrawler/spider"
+	"github.com/hako/durafmt"
+	"github.com/leosykes117/gocrawler/pkg/scraper"
 )
 
 func main() {
-	initTimer := time.Now().UnixNano() / int64(time.Millisecond)
-	spider := spider.New()
-	//spider.StartCrawler()
-	spider.StartScraper()
-	endTimer := time.Now().UnixNano() / int64(time.Millisecond)
-	log.Printf("Tiempo: %v s", (endTimer-initTimer)/1000)
+	start := time.Now()
+	spider := scraper.New()
+	spider.GetAllUrls()
+	elapsed := time.Since(start)
+	fmt.Println("Tiempo:", durafmt.Parse(elapsed))
 }
