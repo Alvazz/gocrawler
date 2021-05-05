@@ -3,6 +3,8 @@
 
 # Permite los archivos y directorios
 !.env
+!cmd
+!internal
 !pkg
 !bin
 !*.go

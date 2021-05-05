@@ -2,11 +2,13 @@ all: bin/example
 test: lint unit-test
 
 PLATFORM=local
+PROJECT=crawler
 
 .PHONY: bin/example
 bin/example:
 	@docker buildx build . --target bin \
 	--output bin/ \
+	--build-arg PROJECT=${PROJECT} \
 	--platform ${PLATFORM}
 
 .PHONY: unit-test
