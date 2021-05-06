@@ -98,9 +98,10 @@ func SetEnv(envar string, val interface{}) error {
 
 func toMap() map[string]string {
 	v := reflect.ValueOf(crawlerEnvVars)
+	typeOfS := v.Type()
 	vars := make(map[string]string)
 	for i := 0; i < v.NumField(); i++ {
-		name := v.Field(i).Type().Name()
+		name := typeOfS.Field(i).Name
 		vars[name] = fmt.Sprint(v.Field(i).Interface())
 	}
 	return vars
