@@ -35,16 +35,16 @@ provider:
 #            - "/*"
 
 package:
-  exclude:
-    - ./**
-  include:
-    - ./bin/**
+  individually: true
+  patterns:
+    - '!./**'
 
 functions:
   parser:
     handler: bin/parser
     description: Obtiene los productos almacenados en Redis y envía sus comentarios a Comprehend
-    timeout: 10
+    timeout: 600 
+    memorySize: 512
     vpc:
       securityGroupIds:
         - sg-04f3f3b446ccc4867
@@ -54,6 +54,9 @@ functions:
       - schedule:
           rate: rate(3 minutes)
           enabled: false
+    package:
+      patterns:
+        - './bin/parser'
 
 #    Define function environment variables here
 #    environment:

@@ -90,7 +90,6 @@ func (r *itemRepository) CreateItem(ctx context.Context, item *item.Item) error 
 }
 
 func (r *itemRepository) FetchItemID(ctx context.Context, conn redis.Conn, ID string) (*item.Item, error) {
-	fmt.Println("Obteniendo el item", ID)
 	var (
 		id, name, brand, description, sourceStore, url string
 		rating                                         float64
@@ -148,7 +147,6 @@ func (r *itemRepository) FetchItemID(ctx context.Context, conn redis.Conn, ID st
 
 func (r *itemRepository) FetchItemDetails(ctx context.Context, conn redis.Conn, detailID string) (item.ProductDetails, error) {
 	var err error
-	fmt.Println("Obteniendo los detalles", detailID)
 	if conn == nil {
 		conn, err = r.pool.GetContext(ctx)
 	}
@@ -166,7 +164,6 @@ func (r *itemRepository) FetchItemDetails(ctx context.Context, conn redis.Conn, 
 }
 
 func (r *itemRepository) FetchReviews(ctx context.Context, conn redis.Conn, commentID string) (item.Comments, error) {
-	fmt.Println("Obteniendo los comentarios", commentID)
 	var (
 		title, content, author string
 		stars                  float64

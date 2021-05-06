@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
@@ -101,7 +102,8 @@ func toMap() map[string]string {
 	typeOfS := v.Type()
 	vars := make(map[string]string)
 	for i := 0; i < v.NumField(); i++ {
-		name := typeOfS.Field(i).Name
+		tag := string(typeOfS.Field(i).Tag)
+		name := tag[strings.Index(tag, ":")+2 : len(tag)-1]
 		vars[name] = fmt.Sprint(v.Field(i).Interface())
 	}
 	return vars

@@ -13,16 +13,16 @@ const (
 	scanCount = 200
 )
 
-var (
-	items  item.Items
-	cursor int = 0
-	count  int = 0
-	loop   int = 0
-	keys   []string
-)
-
 // GetItemsFromCache obtiene n cantidad de items almacenado en Redis
 func GetItemsFromCache() (map[string]interface{}, error) {
+	var (
+		items  item.Items
+		cursor int = 0
+		count  int = 0
+		loop   int = 0
+		keys   []string
+	)
+
 	err := env.ReadVars()
 	if err != nil {
 		return nil, fmt.Errorf("Error al leer la configuración: %v", err)
