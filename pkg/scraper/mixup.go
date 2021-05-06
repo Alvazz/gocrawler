@@ -6,8 +6,9 @@ import (
 	"strings"
 
 	"github.com/gocolly/colly"
+	"github.com/leosykes117/gocrawler/internal/env"
+	"github.com/leosykes117/gocrawler/internal/logging"
 	"github.com/leosykes117/gocrawler/pkg/item"
-	"github.com/leosykes117/gocrawler/pkg/logging"
 	"github.com/leosykes117/gocrawler/pkg/storage/redis"
 )
 
@@ -103,7 +104,8 @@ func (m *mixup) GetProductDetails(e *colly.HTMLElement, s *Scraper) {
 		details,
 	)
 
-	repo := redis.NewRepository(redis.NewConn(crawlerVars["REDIS_ENDPOINT"]))
+	endpoint, _ := env.GetEnvs(env.RedisEndpoint)
+	repo := redis.NewRepository(redis.NewConn(endpoint.(string)))
 	if err := repo.CreateItem(context.Background(), product); err != nil {
 		logging.ErrorLogger.Fatalf("Ocurrio un error al guardar el producto %s: %v", product.ID, err)
 	}

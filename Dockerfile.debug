@@ -1,8 +1,0 @@
-FROM ubuntu:18.04
-
-RUN apt-get update && apt-get install net-tools figlet curl -y
-
-EXPOSE 80/tcp
-EXPOSE 80/udp
-EXPOSE 443/tcp
-EXPOSE 443/udp

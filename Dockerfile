@@ -10,10 +10,11 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 FROM base AS build
 ARG TARGETOS
 ARG TARGETARCH
+ARG PROJECT=crawler
 RUN --mount=target=. \
     --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /out/crawler .
+    GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /out/${PROJECT} cmd/${PROJECT}/main.go
 
 FROM base AS unit-test
 RUN --mount=target=. \
@@ -35,12 +36,12 @@ FROM scratch AS unit-test-coverage
 COPY --from=unit-test /out/cover.out /cover.out
 
 FROM scratch AS bin-unix
-COPY --from=build /out/crawler /
+COPY --from=build /out/${PROJECT} /
 
 FROM bin-unix AS bin-linux
 FROM bin-unix AS bin-darwin
 
 FROM scratch AS bin-windows
-COPY --from=build /out/crawler /crawler.exe
+COPY --from=build /out/${PROJECT} /${PROJECT}.exe
 
 FROM bin-${TARGETOS} as bin

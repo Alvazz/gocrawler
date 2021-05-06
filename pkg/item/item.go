@@ -69,6 +69,16 @@ func NewItem(name, brand, description, sourceStore, url string, rating Score, re
 	}
 }
 
+func NewComment(title, content, author string, stars Score, date time.Time) *Comment {
+	return &Comment{
+		Title:   title,
+		Content: content,
+		Author:  author,
+		Stars:   stars,
+		Date:    date,
+	}
+}
+
 type Repository interface {
 	// CreateGopher saves a given gopher
 	CreateItem(context.Context, *Item) error
