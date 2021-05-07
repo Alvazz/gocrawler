@@ -107,5 +107,8 @@ $RECYCLE.BIN/
 bin/*
 *.env
 
+# Serverless directories
+.serverless
+
 # Kepp all files .gitkeep
 !*/.gitkeep
