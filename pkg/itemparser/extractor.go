@@ -34,6 +34,7 @@ func GetItemsFromCache() (map[string]interface{}, error) {
 	}
 
 	repo := redis.NewRepository(redis.NewConn(endpoint.(string)))
+	anlz := NewAnalyzer()
 	for {
 		ctx := context.Background()
 		items, cursor, err = repo.FetchTopItems(ctx, cursor, scanCount)
@@ -41,30 +42,30 @@ func GetItemsFromCache() (map[string]interface{}, error) {
 			return nil, fmt.Errorf("Error al obtener los productos de redis: %v", err)
 		}
 
-		if err != nil {
-			return nil, fmt.Errorf("Error al crear el archivo: %v", err)
-		}
-
 		if len(items) > 0 {
 			count += len(items)
 			keys = make([]string, 0)
-			for _, item := range items {
-				fmt.Printf("item => %+v\n", item)
-				productKey := fmt.Sprintf("product:%s", item.ID)
-				commentsKey := fmt.Sprintf("comments:%s", item.ID)
-				detailsKey := fmt.Sprintf("details:%s", item.ID)
+			for _, itm := range items {
+				//fmt.Printf("item => %+v\n", itm)
+				productKey := fmt.Sprintf("product:%s", itm.ID)
+				commentsKey := fmt.Sprintf("comments:%s", itm.ID)
+				detailsKey := fmt.Sprintf("details:%s", itm.ID)
 				keys = append(keys, productKey, commentsKey, detailsKey)
 
-				for i := 0; i < len(item.Reviews); i++ {
-					commentKey := fmt.Sprintf("comment:%d:%s", i, item.ID)
+				for i := 0; i < len(itm.Reviews); i++ {
+					commentKey := fmt.Sprintf("comment:%d:%s", i, itm.ID)
 					keys = append(keys, commentKey)
 				}
+				reviewAnalysis := anlz.AnalyzeComments(itm.ID, itm.Reviews)
+				for k, v := range reviewAnalysis {
+					fmt.Printf("%s, %s", k, v.GoString())
+				}
 			}
-			err := repo.Delete(ctx, keys...)
+			/* err := repo.Delete(ctx, keys...)
 			fmt.Println("Productos eliminados:", len(keys))
 			if err != nil {
 				return nil, fmt.Errorf("Error al eliminar los productos de redis: %v", err)
-			}
+			} */
 		}
 
 		loop++

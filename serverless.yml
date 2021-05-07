@@ -13,6 +13,15 @@ provider:
     role:
       name: comparison-shopping-role
       path: /dev-service-role/lambda/
+      statements:
+        - Effect: 'Allow'
+          Action:
+            - 'comprehend:DetectSentiment'
+            - 'comprehend:DetectDominantLanguage'
+            - 'comprehend:DetectEntities'
+            - 'comprehend:DetectKeyPhrases'
+            - 'comprehend:DetectSyntax'
+          Resource: '*'
 
   environment:
     GO_CRAWLER_REDIS_ENDPOINT: comparison-shopping-cache.qlaosm.0001.use1.cache.amazonaws.com:6379
