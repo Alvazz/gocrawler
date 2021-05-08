@@ -3,7 +3,9 @@ package itemparser
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"github.com/hako/durafmt"
 	"github.com/leosykes117/gocrawler/internal/env"
 	"github.com/leosykes117/gocrawler/pkg/item"
 	"github.com/leosykes117/gocrawler/pkg/storage/redis"
@@ -37,11 +39,14 @@ func GetItemsFromCache() (map[string]interface{}, error) {
 	anlz := NewAnalyzer()
 	for {
 		ctx := context.Background()
+		startFetch := time.Now()
 		items, cursor, err = repo.FetchTopItems(ctx, cursor, scanCount)
+		elapsed := time.Since(startFetch)
+		fmt.Println("Tiempo FetchTopItems:", durafmt.Parse(elapsed))
 		if err != nil {
 			return nil, fmt.Errorf("Error al obtener los productos de redis: %v", err)
 		}
-
+		fmt.Println("Número de productos obtenidos:", len(items))
 		if len(items) > 0 {
 			count += len(items)
 			keys = make([]string, 0)
@@ -56,9 +61,13 @@ func GetItemsFromCache() (map[string]interface{}, error) {
 					commentKey := fmt.Sprintf("comment:%d:%s", i, itm.ID)
 					keys = append(keys, commentKey)
 				}
+
 				reviewAnalysis := anlz.AnalyzeComments(itm.ID, itm.Reviews)
-				for k, v := range reviewAnalysis {
-					fmt.Printf("%s, %s", k, v.GoString())
+				fmt.Println("Numero de comentarios analizados:", len(reviewAnalysis))
+				if loop == 0 {
+					for k, v := range reviewAnalysis {
+						fmt.Printf("%s, %s\n", k, v.GoString())
+					}
 				}
 			}
 			/* err := repo.Delete(ctx, keys...)
@@ -73,6 +82,7 @@ func GetItemsFromCache() (map[string]interface{}, error) {
 		if cursor == 0 {
 			fmt.Println("La iteración terminó")
 			fmt.Println("Items:", count)
+			fmt.Println("Iteraciones:", loop)
 			break
 		}
 	}

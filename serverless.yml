@@ -15,12 +15,7 @@ provider:
       path: /dev-service-role/lambda/
       statements:
         - Effect: 'Allow'
-          Action:
-            - 'comprehend:DetectSentiment'
-            - 'comprehend:DetectDominantLanguage'
-            - 'comprehend:DetectEntities'
-            - 'comprehend:DetectKeyPhrases'
-            - 'comprehend:DetectSyntax'
+          Action: 'comprehend:*'
           Resource: '*'
 
   environment:
@@ -52,17 +47,19 @@ functions:
   parser:
     handler: bin/parser
     description: Obtiene los productos almacenados en Redis y envía sus comentarios a Comprehend
-    timeout: 600 
+    timeout: 780
     memorySize: 512
     vpc:
       securityGroupIds:
-        - sg-04f3f3b446ccc4867
+        - sg-02efda80b254c4eaa
       subnetIds:
         - subnet-05c2681596ea123fb
     events:
       - schedule:
-          rate: rate(3 minutes)
+          rate: rate(6 minutes)
           enabled: false
+    environment:
+      AWS_CONFIG_REGION: ${self:provider.region}
     package:
       patterns:
         - './bin/parser'
