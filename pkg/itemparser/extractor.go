@@ -3,6 +3,7 @@ package itemparser
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/hako/durafmt"
@@ -25,14 +26,21 @@ func GetItemsFromCache() (map[string]interface{}, error) {
 		keys   []string
 	)
 
+	if _, ok := os.LookupEnv("GO_CRAWLER_REDIS_ENDPOINT"); !ok {
+		fmt.Println("Leyendo las variables del archivo")
+		if err := env.LoadVars(); err != nil {
+			return nil, fmt.Errorf("Error al establecer las variables: %v", err)
+		}
+	}
+
 	err := env.ReadVars()
 	if err != nil {
 		return nil, fmt.Errorf("Error al leer la configuración: %v", err)
 	}
 
-	endpoint, err := env.GetEnvs(env.RedisEndpoint)
+	endpoint, err := env.GetCrawlerVars(env.RedisEndpoint)
 	if err != nil {
-		return nil, fmt.Errorf("Error al obtenerl el endpoint de redis: %v", err)
+		return nil, fmt.Errorf("Error al obtener el endpoint de redis: %v", err)
 	}
 
 	repo := redis.NewRepository(redis.NewConn(endpoint.(string)))
@@ -62,19 +70,19 @@ func GetItemsFromCache() (map[string]interface{}, error) {
 					keys = append(keys, commentKey)
 				}
 
-				reviewAnalysis := anlz.AnalyzeComments(itm.ID, itm.Reviews)
-				fmt.Println("Numero de comentarios analizados:", len(reviewAnalysis))
 				if loop == 0 {
+					reviewAnalysis := anlz.AnalyzeComments(itm.ID, itm.Reviews)
+					fmt.Println("Numero de comentarios analizados:", len(reviewAnalysis))
 					for k, v := range reviewAnalysis {
 						fmt.Printf("%s, %s\n", k, v.GoString())
 					}
 				}
 			}
-			/* err := repo.Delete(ctx, keys...)
+			err := repo.Delete(ctx, keys...)
 			fmt.Println("Productos eliminados:", len(keys))
 			if err != nil {
 				return nil, fmt.Errorf("Error al eliminar los productos de redis: %v", err)
-			} */
+			}
 		}
 
 		loop++

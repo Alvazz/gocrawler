@@ -22,22 +22,6 @@ provider:
     GO_CRAWLER_REDIS_ENDPOINT: comparison-shopping-cache.qlaosm.0001.use1.cache.amazonaws.com:6379
     GO_CRAWLER_REDIS_PORT: 6379
 
-# you can add statements to the Lambda function's IAM Role here
-#  iamRoleStatements:
-#    - Effect: "Allow"
-#      Action:
-#        - "s3:ListBucket"
-#      Resource: { "Fn::Join" : ["", ["arn:aws:s3:::", { "Ref" : "ServerlessDeploymentBucket" } ] ]  }
-#    - Effect: "Allow"
-#      Action:
-#        - "s3:PutObject"
-#      Resource:
-#        Fn::Join:
-#          - ""
-#          - - "arn:aws:s3:::"
-#            - "Ref" : "ServerlessDeploymentBucket"
-#            - "/*"
-
 package:
   individually: true
   patterns:
@@ -47,7 +31,7 @@ functions:
   parser:
     handler: bin/parser
     description: Obtiene los productos almacenados en Redis y envía sus comentarios a Comprehend
-    timeout: 780
+    timeout: 300
     memorySize: 512
     vpc:
       securityGroupIds:
@@ -63,19 +47,3 @@ functions:
     package:
       patterns:
         - './bin/parser'
-
-#    Define function environment variables here
-#    environment:
-#      variable2: value2
-
-# you can add CloudFormation resource templates here
-#resources:
-#  Resources:
-#    NewResource:
-#      Type: AWS::S3::Bucket
-#      Properties:
-#        BucketName: my-new-bucket
-#  Outputs:
-#     NewOutput:
-#       Description: "Description for the output"
-#       Value: "Some output value"

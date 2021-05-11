@@ -38,18 +38,18 @@ func init() {
 	_, ok := os.LookupEnv("GO_CRAWLER_SEEDURL")
 	if !ok {
 		fmt.Println("Leyendo las variables del archivo")
-		if err := env.LoadVars(); err != nil {
+		if err := env.LoadVars("go_crawler"); err != nil {
 			logging.ErrorLogger.Fatal(err)
 		}
 	}
-	if err := env.ReadVars(); err != nil {
+	if err := env.ReadVars("go_crawler"); err != nil {
 		logging.ErrorLogger.Fatal(err)
 	}
 }
 
 // New es el metodo que instancia la clase Scraper
 func New() *Scraper {
-	seedURL, _ := env.GetEnvs(env.SeedURL)
+	seedURL, _ := env.GetCrawlerVars(env.SeedURL)
 	return &Scraper{
 		lock:             &sync.RWMutex{},
 		visitsCount:      0,
@@ -129,7 +129,7 @@ func (s *Scraper) GetAllUrls() {
 		}
 		logging.ErrorLogger.Printf("OnError:%s\n\tID: %s,\n\tStartAt: %s", e, r.Ctx.Get("ID"), strStartAt)
 
-		debugReq, err := env.GetEnvs(env.DebugRequests)
+		debugReq, err := env.GetCrawlerVars(env.DebugRequests)
 		if err != nil {
 			logging.ErrorLogger.Printf("Error la obtener la bandera de debug")
 		}
@@ -163,7 +163,7 @@ func (s *Scraper) GetAllUrls() {
 		if err != nil {
 			logging.WarningLogger.Printf("Error al parsear la fecha: %v", err)
 		}
-		debugReq, err := env.GetEnvs(env.DebugRequests)
+		debugReq, err := env.GetCrawlerVars(env.DebugRequests)
 		if err != nil {
 			logging.ErrorLogger.Printf("Error la obtener la bandera de debug")
 		}
@@ -228,12 +228,12 @@ func (s *Scraper) GetAllUrls() {
 	c.Wait()
 	logging.InfoLogger.Println("Escribiendo los resultados")
 
-	err = env.SetEnv(env.SeedURL, s.seedURL)
+	err = env.SetCrawlerVars(env.SeedURL, s.seedURL)
 	if err != nil {
 		fmt.Printf("Error al escribir la última URL visitada: %v", err)
 	}
 
-	err = env.WriteVars()
+	err = env.WriteVars("go_crawler")
 	if err != nil {
 		fmt.Printf("Error al escribir el archivo .env: %v", err)
 	}
@@ -303,7 +303,7 @@ func (s *Scraper) saveProducts(filePath string) error {
 		if err != nil {
 			return err
 		}
-		endpoint, _ := env.GetEnvs(env.RedisEndpoint)
+		endpoint, _ := env.GetCrawlerVars(env.RedisEndpoint)
 		repo := redis.NewRepository(redis.NewConn(endpoint.(string)))
 		for _, product := range s.acquiredProducts {
 			if err := repo.CreateItem(context.Background(), product); err != nil {

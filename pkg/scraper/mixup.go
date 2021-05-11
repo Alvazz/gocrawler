@@ -104,7 +104,7 @@ func (m *mixup) GetProductDetails(e *colly.HTMLElement, s *Scraper) {
 		details,
 	)
 
-	endpoint, _ := env.GetEnvs(env.RedisEndpoint)
+	endpoint, _ := env.GetCrawlerVars(env.RedisEndpoint)
 	repo := redis.NewRepository(redis.NewConn(endpoint.(string)))
 	if err := repo.CreateItem(context.Background(), product); err != nil {
 		logging.ErrorLogger.Fatalf("Ocurrio un error al guardar el producto %s: %v", product.ID, err)

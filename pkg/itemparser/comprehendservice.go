@@ -31,7 +31,7 @@ func NewAnalyzer() *Analyzer {
 func (a *Analyzer) AnalyzeComments(productID string, comments item.Comments) map[string]*comprehend.DetectSentimentOutput {
 	commentsAnalyzed := make(map[string]*comprehend.DetectSentimentOutput)
 	startService := time.Now()
-	sentiment, err := a.analyzeText("Solo quería encontrar lugares realmente geniales que nunca antes haya visitado pero no tuve suerte aquí. Algunas de las sugerencias son simplemente horribles... ¡me hacían reír! La mayoría de las sugerencias solo eran las grandes ciudades, restaurantes y bares típicos. Nada desconocido aquí. No quiero ir a estos lugares por diversión. No vale la pena para nada", "")
+	sentiment, err := a.analyzeText("Algunas de las sugerencias son simplemente horribles", "")
 	elapsed := time.Since(startService)
 	fmt.Println("Tiempo analyzeText:", durafmt.Parse(elapsed))
 	if err != nil {
