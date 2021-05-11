@@ -96,9 +96,9 @@ func WriteVars(envar ...string) error {
 	for _, file := range envar {
 		switch file {
 		case "go_crawler":
-			mapVars = toMap(&crawlerEnvVars)
+			mapVars = toMap(crawlerEnvVars)
 		case "aws":
-			mapVars = toMap(&awsEnvVars)
+			mapVars = toMap(awsEnvVars)
 		default:
 			return fmt.Errorf("No existe la configuración %s", file)
 		}
