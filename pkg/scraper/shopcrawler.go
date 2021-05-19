@@ -2,6 +2,7 @@ package scraper
 
 import (
 	"github.com/gocolly/colly"
+	"github.com/leosykes117/gocrawler/pkg/item"
 )
 
 type shopCrawler interface {
@@ -12,6 +13,7 @@ type shopCrawler interface {
 }
 
 type shop struct {
+	chacheService       *item.CacheService
 	topLevelDomain      string
 	keywordsValue       string
 	descriptionValue    string

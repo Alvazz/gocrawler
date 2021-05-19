@@ -1,7 +1,6 @@
 package item
 
 import (
-	"context"
 	"fmt"
 	"time"
 
@@ -9,10 +8,10 @@ import (
 )
 
 type Comment struct {
-	Title   string
-	Content string
-	Author  string
-	Stars   Score
+	Title   string `redis:"title"`
+	Content string `redis:"content"`
+	Author  string `redis:"author"`
+	Stars   Score  `redis:"stars"`
 	Date    time.Time
 }
 
@@ -24,28 +23,28 @@ type ProductDetails map[string]string
 type Item struct {
 	// ID es el identificador del producto.
 	// Es el SHA1 formado por la cadena "`Nombre del Producto`/`TIENDA DE PROCEDENCIA`/`SKU`"
-	ID string
+	ID string `redis:"id"`
 
 	// Name es el nombre del producto.
-	Name string
+	Name string `redis:"name"`
 
 	// Brand es el nombre del producto.
-	Brand string
+	Brand string `redis:"brand"`
 
 	//Description contiene el texto con la descripción del producto
-	Description string
+	Description string `redis:"description"`
 
 	// Rating contiene la puntuación del producto.
-	Rating Score
+	Rating Score `redis:"score"`
 
 	// Reviews es la lista de los comentarios del productos
 	Reviews Comments
 
 	// SourceStore
-	SourceStore string
+	SourceStore string `redis:"sourceStore"`
 
 	// URL
-	URL string
+	URL string `redis:"url"`
 
 	// Data contiene un diccionario de datos extra del producto que son
 	// especificos de la tienda donde se obtine el producto
@@ -77,11 +76,4 @@ func NewComment(title, content, author string, stars Score, date time.Time) *Com
 		Stars:   stars,
 		Date:    date,
 	}
-}
-
-type Repository interface {
-	// CreateGopher saves a given gopher
-	CreateItem(context.Context, *Item) error
-	//
-	FetchItemID(context.Context, string) (*Item, error)
 }

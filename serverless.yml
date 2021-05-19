@@ -19,7 +19,7 @@ provider:
           Resource: '*'
 
   environment:
-    GO_CRAWLER_REDIS_ENDPOINT: comparison-shopping-cache.qlaosm.0001.use1.cache.amazonaws.com:6379
+    GO_CRAWLER_REDIS_ENDPOINT: comparison-shopping-cache.qlaosm.0001.use1.cache.amazonaws.com
     GO_CRAWLER_REDIS_PORT: 6379
 
 package:
@@ -31,7 +31,7 @@ functions:
   parser:
     handler: bin/parser
     description: Obtiene los productos almacenados en Redis y envía sus comentarios a Comprehend
-    timeout: 300
+    timeout: 150
     memorySize: 512
     vpc:
       securityGroupIds:
@@ -40,7 +40,7 @@ functions:
         - subnet-05c2681596ea123fb
     events:
       - schedule:
-          rate: rate(6 minutes)
+          rate: rate(3 minutes)
           enabled: false
     environment:
       AWS_CONFIG_REGION: ${self:provider.region}

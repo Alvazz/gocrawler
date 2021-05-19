@@ -61,8 +61,8 @@ func ReadVars(envarprefixes ...string) error {
 	var (
 		i interface{}
 	)
-	if envarprefixes == nil || len(envarprefixes) == 0 {
-		for k, _ := range envFiles {
+	if len(envarprefixes) == 0 {
+		for k := range envFiles {
 			envarprefixes = append(envarprefixes, k)
 		}
 	}

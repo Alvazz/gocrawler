@@ -3,12 +3,11 @@ package itemparser
 import (
 	"fmt"
 	"os"
-	"time"
+	"sync"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/comprehend"
-	"github.com/hako/durafmt"
 	"github.com/leosykes117/gocrawler/pkg/item"
 )
 
@@ -16,29 +15,34 @@ type Analyzer struct {
 	client *comprehend.Comprehend
 }
 
-func NewAnalyzer() *Analyzer {
-	region := os.Getenv("AWS_CONFIG_REGION")
-	sess := session.Must(session.NewSession(&aws.Config{
-		Region: aws.String(region),
-	}))
-	svc := comprehend.New(sess)
-	anlz := &Analyzer{
-		client: svc,
-	}
-	return anlz
+var (
+	anlz *Analyzer
+	once sync.Once
+)
+
+func NewAnalyzer() {
+	once.Do(func() {
+		region := os.Getenv("AWS_CONFIG_REGION")
+		sess := session.Must(session.NewSession(&aws.Config{
+			Region: aws.String(region),
+		}))
+		svc := comprehend.New(sess)
+		anlz = &Analyzer{
+			client: svc,
+		}
+	})
 }
 
-func (a *Analyzer) AnalyzeComments(productID string, comments item.Comments) map[string]*comprehend.DetectSentimentOutput {
+func (a *Analyzer) AnalyzeComments(productID string, reviews item.Comments) map[string]*comprehend.DetectSentimentOutput {
 	commentsAnalyzed := make(map[string]*comprehend.DetectSentimentOutput)
-	startService := time.Now()
-	sentiment, err := a.analyzeText("Algunas de las sugerencias son simplemente horribles", "")
-	elapsed := time.Since(startService)
-	fmt.Println("Tiempo analyzeText:", durafmt.Parse(elapsed))
-	if err != nil {
-		fmt.Println("ERROR al analizar comentario: ", err)
+	for i, review := range reviews {
+		sentimentData, err := a.analyzeText(review.Content, "es")
+		if err != nil {
+			fmt.Println("ERROR al analizar comentario: ", err)
+		}
+		commentKey := fmt.Sprintf("comment:%d:%s", i, productID)
+		commentsAnalyzed[commentKey] = sentimentData
 	}
-	commentKey := fmt.Sprintf("comment:%d:%s", 0, productID)
-	commentsAnalyzed[commentKey] = sentiment
 	return commentsAnalyzed
 }
 

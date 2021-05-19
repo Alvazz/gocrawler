@@ -1,12 +1,8 @@
 package main
 
 import (
-	"encoding/json"
-	"net/http"
-
-	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/leosykes117/gocrawler/pkg/itemparser"
+	"github.com/leosykes117/gocrawler/pkg/api"
 )
 
 type ResponseAPI struct {
@@ -16,53 +12,20 @@ type ResponseAPI struct {
 }
 
 func main() {
-	lambda.Start(noAPI)
+	lambda.Start(HandleRequest)
+	/* start := time.Now()
+	api.NewServices().ParserItems()
+	elapsed := time.Since(start)
+	fmt.Println("Tiempo:", durafmt.Parse(elapsed)) */
 }
 
-func _(ev events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	resp := events.APIGatewayProxyResponse{
-		Headers: map[string]string{
-			"Content-Type":                 "application/json",
-			"Access-Control-Allow-Origin":  "*",
-			"Access-Control-Allow-Methods": "GET,HEAD,OPTIONS,POST",
-		},
-		StatusCode: http.StatusInternalServerError,
-	}
-
-	result, err := itemparser.GetItemsFromCache()
-	if err != nil {
-		return resp, err
-	}
-
-	bytes, err := json.Marshal(ResponseAPI{
-		Success: true,
-		Status:  http.StatusOK,
-		Result:  result,
-	})
-	if err != nil {
-		return resp, err
-	}
-
-	resp.Body = string(bytes)
-	resp.StatusCode = http.StatusOK
-
-	return resp, nil
-}
-
-func noAPI() (string, error) {
-	result, err := itemparser.GetItemsFromCache()
+func HandleRequest() (string, error) {
+	srvc, err := api.NewServices()
 	if err != nil {
 		return "", err
 	}
-
-	bytes, err := json.Marshal(ResponseAPI{
-		Success: true,
-		Status:  http.StatusOK,
-		Result:  result,
-	})
-	if err != nil {
+	if err = srvc.ParserItems(); err != nil {
 		return "", err
 	}
-
-	return string(bytes), nil
+	return "ejecución correcta", nil
 }

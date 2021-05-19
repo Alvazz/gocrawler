@@ -17,15 +17,13 @@ type itemRepository struct {
 	pool *redis.Pool
 }
 
-func NewRepository(pool *redis.Pool) *itemRepository {
-	return &itemRepository{
-		pool: pool,
-	}
+func NewRepository(pool *redis.Pool) item.Cache {
+	return &itemRepository{pool}
 }
 
-func (r *itemRepository) CreateItem(ctx context.Context, item *item.Item) error {
+func (r *itemRepository) Set(ctx context.Context, item *item.Item) error {
 	var err error
-	conn := r.pool.Get()
+	conn, err := r.pool.GetContext(ctx)
 	defer r.pool.Close()
 
 	productKey := fmt.Sprintf("product:%s", item.ID)
@@ -51,7 +49,7 @@ func (r *itemRepository) CreateItem(ctx context.Context, item *item.Item) error 
 		if err != nil {
 			return err
 		}
-		err = conn.Send("HMSET", commentKey, "tile", comment.Title, "content", comment.Content, "author", comment.Author, "stars", comment.Stars, "date", comment.Date.Format("02/01/2006 15:04:05"))
+		err = conn.Send("HMSET", commentKey, "title", comment.Title, "content", comment.Content, "author", comment.Author, "stars", comment.Stars, "date", comment.Date.Format("02/01/2006 15:04:05"))
 		if err != nil {
 			return err
 		}
@@ -89,7 +87,7 @@ func (r *itemRepository) CreateItem(ctx context.Context, item *item.Item) error 
 	return nil
 }
 
-func (r *itemRepository) FetchItemID(ctx context.Context, conn redis.Conn, ID string) (*item.Item, error) {
+func (r *itemRepository) Get(ctx context.Context, ID string) (*item.Item, error) {
 	var (
 		id, name, brand, description, sourceStore, url string
 		rating                                         float64
@@ -98,17 +96,15 @@ func (r *itemRepository) FetchItemID(ctx context.Context, conn redis.Conn, ID st
 		err                                            error
 	)
 
-	if conn == nil {
-		conn, err = r.pool.GetContext(ctx)
-	}
-
+	conn, err := r.pool.GetContext(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Error al obtener la conexión: %v", err)
 	}
 
 	result, err := redis.StringMap(conn.Do("HGETALL", ID))
+	conn.Close()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Error en el HGETALL: %v", err)
 	}
 
 	for k, v := range result {
@@ -128,14 +124,14 @@ func (r *itemRepository) FetchItemID(ctx context.Context, conn redis.Conn, ID st
 		case "score":
 			rating, _ = strconv.ParseFloat(v, 64)
 		case "reviews":
-			reviews, err = r.FetchReviews(ctx, conn, v)
+			reviews, err = r.FetchReviews(ctx, nil, v)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("Error al obtener los comentarios: %v", err)
 			}
 		case "details":
-			details, err = r.FetchItemDetails(ctx, conn, v)
+			details, err = r.FetchItemDetails(ctx, nil, v)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("Error al obtener los detalles del producto: %v", err)
 			}
 		}
 	}
@@ -149,6 +145,7 @@ func (r *itemRepository) FetchItemDetails(ctx context.Context, conn redis.Conn, 
 	var err error
 	if conn == nil {
 		conn, err = r.pool.GetContext(ctx)
+		defer conn.Close()
 	}
 
 	if err != nil {
@@ -165,14 +162,12 @@ func (r *itemRepository) FetchItemDetails(ctx context.Context, conn redis.Conn, 
 
 func (r *itemRepository) FetchReviews(ctx context.Context, conn redis.Conn, commentID string) (item.Comments, error) {
 	var (
-		title, content, author string
-		stars                  float64
-		date                   time.Time
-		reviews                item.Comments
-		err                    error
+		reviews item.Comments
+		err     error
 	)
 	if conn == nil {
 		conn, err = r.pool.GetContext(ctx)
+		defer conn.Close()
 	}
 	if err != nil {
 		return nil, err
@@ -186,62 +181,78 @@ func (r *itemRepository) FetchReviews(ctx context.Context, conn redis.Conn, comm
 	reviews = make(item.Comments, 0, len(result))
 
 	for _, k := range result {
-		commentData, err := redis.StringMap(conn.Do("HGETALL", k))
+		comment, err := r.GetCommentByID(ctx, conn, k)
 		if err != nil {
-			fmt.Printf("Ocurrio un error al obtener el comentario %s\n", commentID)
+			fmt.Printf("Ocurrio un error al obtener el comentario %s: %v\n", commentID, err)
 		}
-		for key, val := range commentData {
-			switch key {
-			case "tile":
-				title = val
-			case "content":
-				content = val
-			case "author":
-				author = val
-			case "stars":
-				stars, _ = strconv.ParseFloat(val, 64)
-			case "date":
-				date, _ = time.Parse("02/01/2006 15:04:05", val)
-			}
-		}
-		reviews = append(reviews, item.NewComment(title, content, author, item.Score(stars), date))
+		reviews = append(reviews, comment)
 	}
 	return reviews, nil
 }
 
-func (r *itemRepository) FetchTopItems(ctx context.Context, cursor int, n int) (item.Items, int, error) {
-	var items item.Items
+func (r *itemRepository) GetCommentByID(ctx context.Context, conn redis.Conn, commentID string) (*item.Comment, error) {
+	var (
+		title, content, author string
+		stars                  float64
+		date                   time.Time
+		err                    error
+	)
+
+	if conn == nil {
+		conn, err = r.pool.GetContext(ctx)
+		defer conn.Close()
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	commentData, err := redis.StringMap(conn.Do("HGETALL", commentID))
+	if err != nil {
+		return nil, err
+	}
+
+	for key, val := range commentData {
+		switch key {
+		case "tile":
+			title = val
+		case "content":
+			content = val
+		case "author":
+			author = val
+		case "stars":
+			stars, _ = strconv.ParseFloat(val, 64)
+		case "date":
+			date, _ = time.Parse("02/01/2006 15:04:05", val)
+		}
+	}
+	return item.NewComment(title, content, author, item.Score(stars), date), nil
+}
+
+func (r *itemRepository) Scan(ctx context.Context, cursor int, n int) ([]string, int, error) {
 	conn, err := r.pool.GetContext(ctx)
 	if err != nil {
 		return nil, cursor, err
 	}
+	defer conn.Close()
 
-	arr, err := redis.Values(conn.Do("SCAN", strconv.Itoa(cursor), "MATCH", "product:*", "COUNT", strconv.Itoa(n)))
+	arr, err := redis.Values(conn.Do("SCAN", cursor, "MATCH", "product:*", "COUNT", n))
 	if err != nil {
 		return nil, cursor, err
 	}
 
 	if len(arr) == 0 {
-		return item.Items{}, cursor, nil
+		return nil, cursor, nil
 	}
 
 	cursor, _ = redis.Int(arr[0], nil)
-	fmt.Println("\n\nCursor:", cursor)
-
 	keys, _ := redis.Strings(arr[1], nil)
-	for _, k := range keys {
-		i, err := r.FetchItemID(ctx, conn, k)
-		if err != nil {
-			fmt.Printf("ERROR %s => %v", k, err)
-		}
-		items = append(items, i)
-	}
-
-	return items, cursor, nil
+	fmt.Println("Cursor:", cursor)
+	return keys, cursor, nil
 }
 
 func (r *itemRepository) Delete(ctx context.Context, keys ...string) error {
 	conn, err := r.pool.GetContext(ctx)
+	defer conn.Close()
 	if err != nil {
 		return err
 	}

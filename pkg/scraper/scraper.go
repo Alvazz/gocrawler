@@ -1,8 +1,6 @@
 package scraper
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -21,7 +19,6 @@ import (
 	"github.com/leosykes117/gocrawler/internal/logging"
 	"github.com/leosykes117/gocrawler/pkg/ciphersuite"
 	"github.com/leosykes117/gocrawler/pkg/item"
-	"github.com/leosykes117/gocrawler/pkg/storage/redis"
 )
 
 // Scraper es la clase para crear una instancia de la araña web
@@ -104,7 +101,7 @@ func (s *Scraper) GetAllUrls() {
 		RandomDelay: 6 * time.Second,
 	})
 	if err != nil {
-		logging.ErrorLogger.Printf("Ocurrio un error al establecer los limites para el colector: %v", err)
+		logging.ErrorLogger.Fatalf("Ocurrio un error al establecer los limites para el colector: %v", err)
 	}
 
 	// Se ejecuta antes de realizar la solicitud
@@ -238,16 +235,6 @@ func (s *Scraper) GetAllUrls() {
 		fmt.Printf("Error al escribir el archivo .env: %v", err)
 	}
 
-	filename, err := getFilePath("products.json")
-	if err != nil {
-		logging.ErrorLogger.Fatalf("Ocurrio un error al crear el archivo: %v", err)
-	}
-	err = s.saveProducts(filename)
-	if err != nil {
-		logging.ErrorLogger.Fatalf("Ocurrio un error al escribir los elementos en el archivo: %v", err)
-	}
-	logging.InfoLogger.Printf("Archivo creado en %s\n", filename)
-
 	requestsJSON, err := s.requests.MarshalJSON()
 	if err != nil {
 		logging.ErrorLogger.Fatalf("Ocurrio un error al hacer Marshal de las solicitudes:\n%v", err)
@@ -285,33 +272,6 @@ func getFilePath(filename string) (string, error) {
 		}
 	}
 	return filepath.Join(dir, filename), nil
-}
-
-// saveUrls escribe en un archivo los productos obtenidos
-func (s *Scraper) saveProducts(filePath string) error {
-	if len(s.acquiredProducts) > 0 {
-		f, err := os.Create(filePath)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		jsonProducts, err := json.MarshalIndent(s.acquiredProducts, "", "\t")
-		if err != nil {
-			return err
-		}
-		_, err = f.Write(jsonProducts)
-		if err != nil {
-			return err
-		}
-		endpoint, _ := env.GetCrawlerVars(env.RedisEndpoint)
-		repo := redis.NewRepository(redis.NewConn(endpoint.(string)))
-		for _, product := range s.acquiredProducts {
-			if err := repo.CreateItem(context.Background(), product); err != nil {
-				logging.ErrorLogger.Fatalf("Ocurrio un error al guardar el producto %s: %v", product.ID, err)
-			}
-		}
-	}
-	return nil
 }
 
 // randomString genera una cadena de caracteres aleatorios
