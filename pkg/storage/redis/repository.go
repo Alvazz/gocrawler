@@ -24,7 +24,10 @@ func NewRepository(pool *redis.Pool) item.Cache {
 func (r *itemRepository) Set(ctx context.Context, item *item.Item) error {
 	var err error
 	conn, err := r.pool.GetContext(ctx)
-	defer r.pool.Close()
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
 
 	productKey := fmt.Sprintf("product:%s", item.ID)
 	commentsKey := fmt.Sprintf("comments:%s", item.ID)

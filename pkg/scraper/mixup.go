@@ -8,35 +8,34 @@ import (
 	"github.com/gocolly/colly"
 	"github.com/leosykes117/gocrawler/internal/logging"
 	"github.com/leosykes117/gocrawler/pkg/item"
-	"github.com/leosykes117/gocrawler/pkg/storage"
-	"github.com/leosykes117/gocrawler/pkg/storage/redis"
 )
 
 type mixup struct {
 	shop
-	categoryLinkPattern string
-	productLinkPatter   string
 }
 
-// NewShopMixup crea un instancia de la estructura mixup
-func newShopMixup() *mixup {
-	storage.New(storage.Redis)
-	return &mixup{
+// NewShopMixup crea un instancia d la estructura mixup
+func newShopMixup(options ...func(*shop)) *mixup {
+	m := &mixup{
 		shop: shop{
-			chacheService:       item.NewCacheService(redis.NewRepository(storage.MemoryPool())),
+			domainGlob:          `*mixup.*`,
 			topLevelDomain:      "mixup.com",
 			keywordsValue:       "Keywords",
 			descriptionValue:    "Description",
 			linkExtractionQuery: `(?m)https://www\.mixup\.com\.mx/[Mm]ixup/(([Hh]ome\.aspx)|((Categoria|Productos)\.aspx\?(etq\=))|(detproducto\.aspx\?sku=\d+)$)`,
 			linkProductQuery:    `(?m)(https://www\.mixup\.com\.mx/[Mm]ixup/)(detproducto\.aspx\?sku=\d{12,})$`,
-			//linkExtractionQuery: `(?m)(https://www\.mixup\.com\.mx/[Mm]ixup/)(Categoria|Productos)\.aspx\?(etq\=)`,
+			allowedDomains: []string{
+				"https://www.mixup.com.mx",
+				"www.mixup.com.mx",
+				"mixup.com.mx",
+			},
 		},
 	}
-}
 
-// GetCategoryLinkPattern retorna el valor de mixup.categoryLinkPattern
-func (m *mixup) GetCategoryLinkPattern() string {
-	return m.categoryLinkPattern
+	for _, f := range options {
+		f(&m.shop)
+	}
+	return m
 }
 
 // GetMetaTags obtiene el contenido de las etiquetas <meta> de la página web
@@ -54,7 +53,7 @@ func (m *mixup) GetMetaTags(e *colly.HTMLElement) {
 }
 
 // GetProductDetails obtiene los datos del producto de la página
-func (m *mixup) GetProductDetails(e *colly.HTMLElement, s *Scraper) {
+func (m *mixup) GetProductDetails(e *colly.HTMLElement) {
 	var (
 		detailCount                                int = 0
 		name, brand, description, sourceStore, url string
@@ -106,70 +105,7 @@ func (m *mixup) GetProductDetails(e *colly.HTMLElement, s *Scraper) {
 		details,
 	)
 
-	if err := m.chacheService.CreateItem(context.Background(), product); err != nil {
+	if err := m.cacheService.CreateItem(context.Background(), product); err != nil {
 		logging.ErrorLogger.Fatalf("Ocurrio un error al guardar el producto %s: %v", product.ID, err)
 	}
-
-	/* s.acquiredProducts = append(s.acquiredProducts, item.NewItem(
-		name,
-		brand,
-		description,
-		sourceStore,
-		url,
-		rating,
-		reviews,
-		details,
-	)) */
 }
-
-/* func (m *mixup) GetProductData(e *colly.HTMLElement) {
-	if !strings.Contains(e.Request.URL.RawQuery, "sku=") {
-		return
-	}
-	reqID := e.Request.Ctx.Get("ID")
-	productData := make(map[int][]string)
-
-	deleteSpaces := func(s *string) {
-		manySpace := regexp.MustCompile(`(?m)( {2,})`)
-		*s = manySpace.ReplaceAllString(*s, " ")
-		divider := regexp.MustCompile(`(?m)(\r\n|\r|\n)+`)
-		*s = divider.ReplaceAllString(*s, "")
-		*s = strings.TrimSpace(*s)
-	}
-
-	brandProduct := e.ChildText(`div[class*="titulo"]`)
-	deleteSpaces(&brandProduct)
-	logging.InfoLogger.Printf("[%s]Marca y Productos: %s", reqID, brandProduct)
-
-	productDOM := e.DOM
-	prevTag := ""
-	tagID := 0
-	productDOM.Contents().Each(func(i int, element *goquery.Selection) {
-		nodeType := goquery.NodeName(element)
-		if nodeType == "span" && element.HasClass("bold") {
-			key := element.Text()
-			deleteSpaces(&key)
-			if key != "" {
-				productData[tagID] = make([]string, 2)
-				productData[tagID][0] = key
-				prevTag = "span"
-				logging.InfoLogger.Printf("%d[%d]#span: %s", i, tagID, element.Text())
-			}
-		} else if prevTag == "span" && nodeType == "#text" {
-			logging.InfoLogger.Printf("[%d]#text: %s", tagID, element.Text())
-			value := element.Text()
-			deleteSpaces(&value)
-			if value != "" {
-
-				if _, ok := productData[tagID]; !ok {
-					productData[tagID] = make([]string, 2)
-				}
-				productData[tagID][1] = value
-				tagID++
-			}
-		} else {
-			logging.InfoLogger.Printf("[%d]<%s>:%s</%s>", i, nodeType, element.Text(), nodeType)
-		}
-	})
-	logging.InfoLogger.Printf("[%s]Descripción:\n\t%+v", reqID, productData)
-} */

@@ -21,15 +21,6 @@ import (
 	"github.com/leosykes117/gocrawler/pkg/item"
 )
 
-// Scraper es la clase para crear una instancia de la araña web
-type Scraper struct {
-	lock             *sync.RWMutex
-	visitsCount      uint
-	seedURL          string
-	requests         scrapingRequests
-	acquiredProducts item.Items
-}
-
 func init() {
 	logging.InitLogging()
 	_, ok := os.LookupEnv("GO_CRAWLER_SEEDURL")
@@ -42,6 +33,15 @@ func init() {
 	if err := env.ReadVars("go_crawler"); err != nil {
 		logging.ErrorLogger.Fatal(err)
 	}
+}
+
+// Scraper es la clase para crear una instancia de la araña web
+type Scraper struct {
+	lock             *sync.RWMutex
+	visitsCount      uint
+	seedURL          string
+	requests         scrapingRequests
+	acquiredProducts item.Items
 }
 
 // New es el metodo que instancia la clase Scraper
@@ -72,10 +72,10 @@ func (s *Scraper) addRequest(rt *requestTracker) {
 
 // GetAllUrls inicia el rasapado de datos
 func (s *Scraper) GetAllUrls() {
-	var shop shopCrawler = newShopMixup()
+	var shop shopCrawler = ShopFactory(Mixup)
 
 	c := colly.NewCollector(
-		colly.AllowedDomains("https://www.mixup.com.mx", "www.mixup.com.mx", "mixup.com.mx"),
+		colly.AllowedDomains(shop.GetAllowedDomains()...),
 		//colly.MaxDepth(8),
 		colly.Async(true),
 		colly.UserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X x.y; rv:42.0) Gecko/20100101 Firefox/42.0"),
@@ -96,7 +96,7 @@ func (s *Scraper) GetAllUrls() {
 	})
 
 	err := c.Limit(&colly.LimitRule{
-		DomainGlob:  `*mixup.*`,
+		DomainGlob:  shop.GetDomainGlob(),
 		Parallelism: 4,
 		RandomDelay: 6 * time.Second,
 	})
@@ -207,7 +207,7 @@ func (s *Scraper) GetAllUrls() {
 	c.OnHTML("html", shop.GetMetaTags)
 	c.OnHTML("div.detail", func(e *colly.HTMLElement) {
 		if strings.Contains(e.Request.URL.RawQuery, "sku=") {
-			shop.GetProductDetails(e, s)
+			shop.GetProductDetails(e)
 		}
 	})
 
