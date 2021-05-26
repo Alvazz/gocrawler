@@ -3,6 +3,7 @@ package itemparser
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/leosykes117/gocrawler/pkg/item"
 )
@@ -37,7 +38,7 @@ func (e *extractor) ScanItems(ctx context.Context, errorsCh chan<- error, itemsC
 		// TODO 💣: pensar bien lo del ctx
 		itemsKeys, cursor, err = e.cacheService.ScanItems(ctx, cursor, scanCount)
 		if err != nil {
-			return err
+			break
 		}
 
 		fmt.Println("Número de productos obtenidos:", len(itemsKeys))
@@ -51,6 +52,7 @@ func (e *extractor) ScanItems(ctx context.Context, errorsCh chan<- error, itemsC
 		}
 
 		w.Shutdown()
+		log.Println("Worker finalizado")
 
 		if cursor == 0 {
 			break
@@ -61,5 +63,5 @@ func (e *extractor) ScanItems(ctx context.Context, errorsCh chan<- error, itemsC
 	fmt.Println("Iteraciones:", e.scanLoops)
 	close(itemsCh)
 	close(errorsCh)
-	return nil
+	return err
 }

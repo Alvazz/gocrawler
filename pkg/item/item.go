@@ -1,7 +1,7 @@
 package item
 
 import (
-	"fmt"
+	"strings"
 	"time"
 
 	"github.com/leosykes117/gocrawler/pkg/ciphersuite"
@@ -53,18 +53,73 @@ type Item struct {
 
 type Items []*Item
 
-func NewItem(name, brand, description, sourceStore, url string, rating Score, reviews Comments, details ProductDetails) *Item {
-	id, _ := ciphersuite.GetMD5Hash(fmt.Sprintf("%s/%s", name, sourceStore))
-	return &Item{
-		ID:          id,
-		Name:        name,
-		Brand:       brand,
-		Description: description,
-		Rating:      rating,
-		Reviews:     reviews,
-		SourceStore: sourceStore,
-		URL:         url,
-		Details:     details,
+func NewItem(members ...func(*Item)) *Item {
+	i := &Item{}
+
+	for _, mem := range members {
+		mem(i)
+	}
+
+	return i
+}
+
+func CreateID(strs ...string) (string, error) {
+	var sb strings.Builder
+	for _, str := range strs {
+		sb.WriteString(str)
+	}
+	strID := sb.String()
+	return ciphersuite.GetMD5Hash(strID)
+}
+
+func ItemID(id string) func(*Item) {
+	return func(i *Item) {
+		i.ID = id
+	}
+}
+
+func ItemName(n string) func(*Item) {
+	return func(i *Item) {
+		i.Name = n
+	}
+}
+
+func ItemBrand(b string) func(*Item) {
+	return func(i *Item) {
+		i.Brand = b
+	}
+}
+
+func ItemDescription(d string) func(*Item) {
+	return func(i *Item) {
+		i.Description = d
+	}
+}
+
+func ItemRating(r float64) func(*Item) {
+	return func(i *Item) {
+		i.Rating = Score(r)
+	}
+}
+
+func ItemReviews(r Comments) func(*Item) {
+	return func(i *Item) {
+		i.Reviews = r
+	}
+}
+func ItemSourceStore(ss string) func(*Item) {
+	return func(i *Item) {
+		i.SourceStore = ss
+	}
+}
+func ItemURL(url string) func(*Item) {
+	return func(i *Item) {
+		i.URL = url
+	}
+}
+func ItemDetails(d ProductDetails) func(*Item) {
+	return func(i *Item) {
+		i.Details = d
 	}
 }
 

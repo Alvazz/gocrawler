@@ -1,7 +1,10 @@
 package main
 
 import (
-	"github.com/aws/aws-lambda-go/lambda"
+	"fmt"
+	"time"
+
+	"github.com/hako/durafmt"
 	"github.com/leosykes117/gocrawler/pkg/api"
 )
 
@@ -12,11 +15,11 @@ type ResponseAPI struct {
 }
 
 func main() {
-	lambda.Start(HandleRequest)
-	/* start := time.Now()
-	api.NewServices().ParserItems()
+	//lambda.Start(HandleRequest)
+	start := time.Now()
+	HandleRequest()
 	elapsed := time.Since(start)
-	fmt.Println("Tiempo:", durafmt.Parse(elapsed)) */
+	fmt.Println("Tiempo:", durafmt.Parse(elapsed))
 }
 
 func HandleRequest() (string, error) {

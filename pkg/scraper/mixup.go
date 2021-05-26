@@ -57,7 +57,7 @@ func (m *mixup) GetProductDetails(e *colly.HTMLElement) {
 	var (
 		detailCount                                int = 0
 		name, brand, description, sourceStore, url string
-		rating                                     item.Score
+		rating                                     float64
 		reviews                                    item.Comments       = make(item.Comments, 0)
 		details                                    item.ProductDetails = make(item.ProductDetails)
 	)
@@ -93,16 +93,21 @@ func (m *mixup) GetProductDetails(e *colly.HTMLElement) {
 
 	description = e.DOM.Parent().NextAllFiltered("div.productcontent").Find("div#tabs-res").Text()
 	description = strings.TrimSpace(description)
+	productID, err := item.CreateID(name, sourceStore)
+	if err != nil {
+		logging.ErrorLogger.Fatalf("Ocurrio un error al crear el id del producto %q: %v", productID, err)
+	}
 
 	product := item.NewItem(
-		name,
-		brand,
-		description,
-		sourceStore,
-		url,
-		rating,
-		reviews,
-		details,
+		item.ItemID(productID),
+		item.ItemName(name),
+		item.ItemBrand(brand),
+		item.ItemDescription(description),
+		item.ItemSourceStore(sourceStore),
+		item.ItemURL(url),
+		item.ItemRating(rating),
+		item.ItemReviews(reviews),
+		item.ItemDetails(details),
 	)
 
 	if err := m.cacheService.CreateItem(context.Background(), product); err != nil {

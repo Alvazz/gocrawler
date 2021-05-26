@@ -1,6 +1,9 @@
 package itemparser
 
-import "sync"
+import (
+	"log"
+	"sync"
+)
 
 type Worker interface {
 	Task()
@@ -33,6 +36,8 @@ func (p *WorkPool) Run(w Worker) {
 }
 
 func (p *WorkPool) Shutdown() {
+	log.Println("Cerrando el canal...")
 	close(p.work)
+	log.Println("Canal cerrado. Esperando a terminar")
 	p.wg.Wait()
 }

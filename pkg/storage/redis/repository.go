@@ -139,8 +139,17 @@ func (r *itemRepository) Get(ctx context.Context, ID string) (*item.Item, error)
 		}
 	}
 
-	i := item.NewItem(name, brand, description, sourceStore, url, item.Score(rating), reviews, details)
-	i.ID = id
+	i := item.NewItem(
+		item.ItemID(id),
+		item.ItemName(name),
+		item.ItemBrand(brand),
+		item.ItemDescription(description),
+		item.ItemSourceStore(sourceStore),
+		item.ItemURL(url),
+		item.ItemRating(rating),
+		item.ItemReviews(reviews),
+		item.ItemDetails(details),
+	)
 	return i, nil
 }
 
