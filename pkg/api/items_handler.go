@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -33,7 +32,7 @@ func (s *Services) ParserItems() error {
 	go func() {
 		for i := range itemsCh {
 			if i != nil {
-				fmt.Println("Eliminando el producto", i.ID)
+				fmt.Println("Eliminando el producto", i.GetID())
 				items = append(items, i)
 			}
 		}
@@ -48,7 +47,7 @@ func (s *Services) ParserItems() error {
 
 	log.Printf("Número de productos obtenidos/eliminados: %d\n", len(items))
 
-	itemsJSON, err := json.MarshalIndent(items, "", "\t")
+	itemsJSON, err := items.MarshalJSON()
 	if err != nil {
 		fmt.Println("Ocurrio un error al hacer marshal de los items")
 	}

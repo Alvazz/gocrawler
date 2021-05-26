@@ -99,18 +99,18 @@ func (m *mixup) GetProductDetails(e *colly.HTMLElement) {
 	}
 
 	product := item.NewItem(
-		item.ItemID(productID),
-		item.ItemName(name),
-		item.ItemBrand(brand),
-		item.ItemDescription(description),
-		item.ItemSourceStore(sourceStore),
-		item.ItemURL(url),
-		item.ItemRating(rating),
-		item.ItemReviews(reviews),
-		item.ItemDetails(details),
+		item.ID(productID),
+		item.Name(name),
+		item.Brand(brand),
+		item.Description(description),
+		item.SourceStore(sourceStore),
+		item.URL(url),
+		item.Rating(rating),
+		item.Reviews(reviews),
+		item.Details(details),
 	)
 
 	if err := m.cacheService.CreateItem(context.Background(), product); err != nil {
-		logging.ErrorLogger.Fatalf("Ocurrio un error al guardar el producto %s: %v", product.ID, err)
+		logging.ErrorLogger.Fatalf("Ocurrio un error al guardar el producto %s: %v", product.GetID(), err)
 	}
 }

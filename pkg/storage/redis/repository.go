@@ -29,9 +29,10 @@ func (r *itemRepository) Set(ctx context.Context, item *item.Item) error {
 	}
 	defer conn.Close()
 
-	productKey := fmt.Sprintf("product:%s", item.ID)
-	commentsKey := fmt.Sprintf("comments:%s", item.ID)
-	detailsKey := fmt.Sprintf("details:%s", item.ID)
+	productID := item.GetID()
+	productKey := fmt.Sprintf("product:%s", productID)
+	commentsKey := fmt.Sprintf("comments:%s", productID)
+	detailsKey := fmt.Sprintf("details:%s", productID)
 
 	// SE CREA LA TRANSACCION
 	err = conn.Send("MULTI")
@@ -39,15 +40,15 @@ func (r *itemRepository) Set(ctx context.Context, item *item.Item) error {
 		return err
 	}
 	// SE CREA EL HASH PRINCIPAL PARA ALMACENAR EL PRODUCTO
-	err = conn.Send("HMSET", productKey, "id", item.ID, "name", item.Name, "brand", item.Brand, "description", item.Description, "score", item.Rating, "reviews", commentsKey, "sourceStore", item.SourceStore, "url", item.URL, "details", detailsKey)
+	err = conn.Send("HMSET", productKey, "id", productID, "name", item.GetName(), "brand", item.GetBrand(), "description", item.GetDescription(), "score", item.GetRating(), "reviews", commentsKey, "sourceStore", item.GetSourceStore(), "url", item.GetURL(), "details", detailsKey)
 	if err != nil {
 		return err
 	}
 
 	// CREAR UNA LISTA DONDE LOS VALORES APUNTAN A UN HASH QUE CONTIENE
 	// LOS DATOS DEL COMENTARIO
-	for i, comment := range item.Reviews {
-		commentKey := fmt.Sprintf("comment:%d:%s", i, item.ID)
+	for i, comment := range item.GetReviews() {
+		commentKey := fmt.Sprintf("comment:%d:%s", i, productID)
 		err = conn.Send("RPUSH", commentsKey, commentKey)
 		if err != nil {
 			return err
@@ -59,7 +60,7 @@ func (r *itemRepository) Set(ctx context.Context, item *item.Item) error {
 	}
 
 	// ALMACENA EL MAP DE LOS DETALLES DEL PRODUCTO
-	for k, v := range item.Details {
+	for k, v := range item.GetDetails() {
 		err = conn.Send("HSETNX", detailsKey, k, v)
 		if err != nil {
 			return err
@@ -79,7 +80,7 @@ func (r *itemRepository) Set(ctx context.Context, item *item.Item) error {
 		if ok {
 			errs = append(errs, fmt.Sprintf("%v", v))
 		} else {
-			fmt.Printf("[%s]Respuesta del comando %d: %v", item.ID, i, v)
+			fmt.Printf("[%s]Respuesta del comando %d: %v", item.GetID(), i, v)
 		}
 	}
 
@@ -140,15 +141,15 @@ func (r *itemRepository) Get(ctx context.Context, ID string) (*item.Item, error)
 	}
 
 	i := item.NewItem(
-		item.ItemID(id),
-		item.ItemName(name),
-		item.ItemBrand(brand),
-		item.ItemDescription(description),
-		item.ItemSourceStore(sourceStore),
-		item.ItemURL(url),
-		item.ItemRating(rating),
-		item.ItemReviews(reviews),
-		item.ItemDetails(details),
+		item.ID(id),
+		item.Name(name),
+		item.Brand(brand),
+		item.Description(description),
+		item.SourceStore(sourceStore),
+		item.URL(url),
+		item.Rating(rating),
+		item.Reviews(reviews),
+		item.Details(details),
 	)
 	return i, nil
 }
