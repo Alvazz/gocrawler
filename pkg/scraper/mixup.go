@@ -52,8 +52,34 @@ func (m *mixup) GetMetaTags(e *colly.HTMLElement) {
 	logging.InfoLogger.Printf("[%s]Description: %s", reqID, description)
 }
 
-// GetProductDetails obtiene los datos del producto de la página
+func (m *mixup) ExtractLinks(onHTML colly.HTMLCallback) (string, colly.HTMLCallback) {
+	const querySelector = "a[href]"
+	return querySelector, func(e *colly.HTMLElement) {
+		link := e.Attr("href")
+		if link == "" {
+			logging.WarningLogger.Println("No se encontro el link")
+		} else {
+			link = e.Request.AbsoluteURL(link)
+			re := regexp.MustCompile(m.linkExtractionQuery)
+			if !re.MatchString(link) {
+				logging.WarningLogger.Printf("La URL no cumple las reglas para ser visitada: %s", link)
+			}
+			if onHTML != nil {
+				onHTML(e)
+			}
+		}
+	}
+}
+
+// GetProductDetails es el callback OnHTML de colly para obtener los detalles del producto
 func (m *mixup) GetProductDetails(e *colly.HTMLElement) {
+	if strings.Contains(e.Request.URL.RawQuery, "sku=") {
+		m.productDetails(e)
+	}
+}
+
+// productDetails busca los detalles del producto en el página obtenida
+func (m *mixup) productDetails(e *colly.HTMLElement) {
 	var (
 		detailCount                                int = 0
 		name, brand, description, sourceStore, url string

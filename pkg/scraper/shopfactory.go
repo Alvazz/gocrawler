@@ -10,6 +10,7 @@ import (
 type shopCrawler interface {
 	GetMetaTags(*colly.HTMLElement)
 	GetProductDetails(*colly.HTMLElement)
+	ExtractLinks(colly.HTMLCallback) (string, colly.HTMLCallback)
 	GetLinkExtractionQuery() string
 	GetLinkProductQuery() string
 	GetAllowedDomains() []string
@@ -21,14 +22,15 @@ const (
 	Amazon = "AMAZON"
 )
 
-func ShopFactory(store string) shopCrawler {
+// shopFactory es el factory de shopCrawler
+func shopFactory(store string) shopCrawler {
 	storage.New(storage.Redis)
 	s := item.NewCacheService(redis.NewRepository(storage.MemoryPool()))
 	switch store {
 	case Mixup:
 		return newShopMixup(cacheService(s))
 	case Amazon:
-		return nil
+		return newShopAmazon(cacheService(s))
 	default:
 		return nil
 	}

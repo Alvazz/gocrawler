@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"sync"
 	"time"
@@ -47,7 +46,7 @@ func (s *Services) ParserItems() error {
 
 	log.Printf("Número de productos obtenidos/eliminados: %d\n", len(items))
 
-	itemsJSON, err := items.MarshalJSON()
+	/* itemsJSON, err := items.MarshalJSON()
 	if err != nil {
 		fmt.Println("Ocurrio un error al hacer marshal de los items")
 	}
@@ -55,7 +54,7 @@ func (s *Services) ParserItems() error {
 	err = ioutil.WriteFile(jsonFile, itemsJSON, 0600)
 	if err != nil {
 		return fmt.Errorf("Ocurrio un error al crear el archivo json: %v", err)
-	}
+	} */
 
 	return nil
 }

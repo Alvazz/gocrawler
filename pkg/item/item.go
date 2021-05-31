@@ -228,6 +228,10 @@ func (i *Item) publicMembers() interface{} {
 	return tmpStruct
 }
 
+func (i *Item) MarshalJSON() ([]byte, error) {
+	return json.MarshalIndent(i.publicMembers(), "", "\t")
+}
+
 func (its Items) MarshalJSON() ([]byte, error) {
 	newList := make([]interface{}, 0)
 	for _, i := range its {
