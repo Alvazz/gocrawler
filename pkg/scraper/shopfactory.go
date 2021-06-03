@@ -7,9 +7,12 @@ import (
 	"github.com/leosykes117/gocrawler/pkg/storage/redis"
 )
 
+type OnHTMLEvent func(colly.HTMLCallback) (string, colly.HTMLCallback)
+
 type shopCrawler interface {
-	GetMetaTags(*colly.HTMLElement)
-	GetProductDetails(*colly.HTMLElement)
+	HTMLEvents(...string) []OnHTMLEvent
+	GetMetaTags(colly.HTMLCallback) (string, colly.HTMLCallback)
+	GetProductDetails(colly.HTMLCallback) (string, colly.HTMLCallback)
 	ExtractLinks(colly.HTMLCallback) (string, colly.HTMLCallback)
 	GetLinkExtractionQuery() string
 	GetLinkProductQuery() string

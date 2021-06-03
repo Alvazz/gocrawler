@@ -2,6 +2,7 @@ package item
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -248,4 +249,9 @@ func NewComment(title, content, author string, stars Score, date time.Time) *Com
 		Stars:   stars,
 		Date:    date,
 	}
+}
+
+func (review *Comment) String() string {
+	return fmt.Sprintf("%s | %s | %0.1f | %s\n",
+		review.Title, review.Author, review.Stars, review.Date.UTC().Format("2 Jan 2006 15:04:05"))
 }

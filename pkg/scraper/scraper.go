@@ -77,7 +77,7 @@ func (s *Scraper) GetAllUrls() {
 
 	c := colly.NewCollector(
 		colly.AllowedDomains(shop.GetAllowedDomains()...),
-		colly.MaxDepth(5),
+		//colly.MaxDepth(5),
 		colly.Async(true),
 		colly.UserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X x.y; rv:42.0) Gecko/20100101 Firefox/42.0"),
 		colly.URLFilters(
@@ -182,8 +182,32 @@ func (s *Scraper) GetAllUrls() {
 		logging.InfoLogger.Printf("OnResponse:\n\tID: %s,\nStartAt: %s", r.Ctx.Get("ID"), strStartAt)
 	})
 
+	funcNames := []string{"ExtractLinks", "GetMetaTags", "GetProductDetails", "GetProductInformation", "GetProductReviews"}
+	callbacks := []colly.HTMLCallback{
+		func(e *colly.HTMLElement) {
+			link := e.Request.AbsoluteURL(e.Attr("href"))
+			siteCookies := c.Cookies(link)
+			if err := c.SetCookies(link, siteCookies); err != nil {
+				logging.ErrorLogger.Println("SET COOKIES ERROR: ", err)
+			}
+			s.visitsCount++
+			err := c.Visit(link)
+			if err != nil {
+				logging.ErrorLogger.Printf("[%s][%s]Ocurrio un error al crear la petición: %v", e.Request.Ctx.Get("ID"), e.Request.AbsoluteURL(link), err)
+			}
+		},
+	}
+	events := shop.HTMLEvents(funcNames...)
+	for i, e := range events {
+		if i >= len(callbacks) {
+			c.OnHTML(e(nil))
+		} else {
+			c.OnHTML(e(callbacks[i]))
+		}
+	}
+
 	// Se ejecuta justo después de OnResponse si el contenido recibido es HTML
-	c.OnHTML(shop.ExtractLinks(func(e *colly.HTMLElement) {
+	/* c.OnHTML(shop.ExtractLinks(func(e *colly.HTMLElement) {
 		link := e.Attr("href")
 		siteCookies := c.Cookies(link)
 		if err := c.SetCookies(link, siteCookies); err != nil {
@@ -195,10 +219,9 @@ func (s *Scraper) GetAllUrls() {
 			logging.ErrorLogger.Printf("[%s][%s]Ocurrio un error al crear la petición: %v", e.Request.Ctx.Get("ID"), e.Request.AbsoluteURL(link), err)
 		}
 	}))
-
 	c.OnHTML("html", shop.GetMetaTags)
 	c.OnHTML("div.detail", shop.GetProductDetails)
-	//c.OnHTML("div#centerCol", shop.GetProductDetails)
+	c.OnHTML("div#centerCol", shop.GetProductDetails) */
 
 	// Es el último callback en ejecutarse
 	c.OnScraped(func(r *colly.Response) {

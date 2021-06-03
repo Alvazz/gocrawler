@@ -38,23 +38,46 @@ func newShopMixup(options ...func(*shop)) *mixup {
 	return m
 }
 
+func (m *mixup) HTMLEvents(evts ...string) []OnHTMLEvent {
+	events := make([]OnHTMLEvent, 0)
+	for _, funcName := range evts {
+		var e OnHTMLEvent
+		switch funcName {
+		case "GetMetaTags":
+			e = m.GetMetaTags
+		case "ExtractLinks":
+			e = m.ExtractLinks
+		case "GetProductDetails":
+			e = m.GetProductDetails
+		default:
+			continue
+		}
+		events = append(events, e)
+	}
+	return events
+}
+
 // GetMetaTags obtiene el contenido de las etiquetas <meta> de la página web
-func (m *mixup) GetMetaTags(e *colly.HTMLElement) {
-	reqID := e.Request.Ctx.Get("ID")
-	logging.InfoLogger.Println("Obteniedo las etiquetas meta[", reqID, "]")
-	property := e.ChildAttr(`meta[property="og:image"]`, "content")
-	imageURL := e.ChildAttr(`meta[name="twitter:image"]`, "content")
-	keywords := e.ChildAttr(`meta[name="Description"]`, "content")
-	description := e.ChildAttr(`meta[name="Keywords"]`, "content")
-	logging.InfoLogger.Printf("[%s]Property: %s", reqID, property)
-	logging.InfoLogger.Printf("[%s]Twitter: %s", reqID, imageURL)
-	logging.InfoLogger.Printf("[%s]Keywords: %s", reqID, keywords)
-	logging.InfoLogger.Printf("[%s]Description: %s", reqID, description)
+func (m *mixup) GetMetaTags(onHTML colly.HTMLCallback) (string, colly.HTMLCallback) {
+	return "html", func(e *colly.HTMLElement) {
+		reqID := e.Request.Ctx.Get("ID")
+		logging.InfoLogger.Println("Obteniedo las etiquetas meta[", reqID, "]")
+		property := e.ChildAttr(`meta[property="og:image"]`, "content")
+		imageURL := e.ChildAttr(`meta[name="twitter:image"]`, "content")
+		keywords := e.ChildAttr(`meta[name="Description"]`, "content")
+		description := e.ChildAttr(`meta[name="Keywords"]`, "content")
+		logging.InfoLogger.Printf("[%s]Property: %s", reqID, property)
+		logging.InfoLogger.Printf("[%s]Twitter: %s", reqID, imageURL)
+		logging.InfoLogger.Printf("[%s]Keywords: %s", reqID, keywords)
+		logging.InfoLogger.Printf("[%s]Description: %s", reqID, description)
+		if onHTML != nil {
+			onHTML(e)
+		}
+	}
 }
 
 func (m *mixup) ExtractLinks(onHTML colly.HTMLCallback) (string, colly.HTMLCallback) {
-	const querySelector = "a[href]"
-	return querySelector, func(e *colly.HTMLElement) {
+	return "a[href]", func(e *colly.HTMLElement) {
 		link := e.Attr("href")
 		if link == "" {
 			logging.WarningLogger.Println("No se encontro el link")
@@ -72,9 +95,14 @@ func (m *mixup) ExtractLinks(onHTML colly.HTMLCallback) (string, colly.HTMLCallb
 }
 
 // GetProductDetails es el callback OnHTML de colly para obtener los detalles del producto
-func (m *mixup) GetProductDetails(e *colly.HTMLElement) {
-	if strings.Contains(e.Request.URL.RawQuery, "sku=") {
-		m.productDetails(e)
+func (m *mixup) GetProductDetails(onHTML colly.HTMLCallback) (string, colly.HTMLCallback) {
+	return "div.detail", func(e *colly.HTMLElement) {
+		if strings.Contains(e.Request.URL.RawQuery, "sku=") {
+			m.productDetails(e)
+			if onHTML != nil {
+				onHTML(e)
+			}
+		}
 	}
 }
 
