@@ -56,6 +56,19 @@ type Item struct {
 	details ProductDetails
 }
 
+type product struct {
+	ID          string         `json:"id"`
+	Name        string         `json:"name"`
+	Price       float64        `json:"price"`
+	Brand       string         `json:"brand"`
+	Description string         `json:"description"`
+	Rating      Score          `json:"score"`
+	Reviews     Comments       `json:"reviews"`
+	SourceStore string         `json:"sourceStore"`
+	URL         string         `json:"url"`
+	Details     ProductDetails `json:"details"`
+}
+
 type Items []*Item
 
 func NewItem(members ...func(*Item)) *Item {
@@ -202,22 +215,62 @@ func (i *Item) GetDetails() ProductDetails {
 	return i.details
 }
 
-func (i *Item) publicMembers() interface{} {
-	tmpStruct := struct {
-		ID          string         `json:"id"`
-		Name        string         `json:"name"`
-		Price       Currency       `json:"price"`
-		Brand       string         `json:"brand"`
-		Description string         `json:"description"`
-		Rating      Score          `json:"score"`
-		Reviews     Comments       `json:"reviews"`
-		SourceStore string         `json:"sourceStore"`
-		URL         string         `json:"url"`
-		Details     ProductDetails `json:"details"`
-	}{
+// SetID .
+func (i *Item) SetID(ID string) {
+	i.id = ID
+}
+
+// SetName es el nombre del producto.
+func (i *Item) SetName(n string) {
+	i.name = n
+}
+
+// SetPrice es el precio del producto.
+func (i *Item) SetPrice(p float64) {
+	i.price = ToCurrency(p)
+}
+
+// SetBrand es el nombre del producto.
+func (i *Item) SetBrand(b string) {
+	i.brand = b
+}
+
+// SetDescription contiene el texto con la descripción del producto
+func (i *Item) SetDescription(d string) {
+	i.description = d
+}
+
+// SetRating contiene la puntuación del producto.
+func (i *Item) SetRating(r float64) {
+	i.rating = Score(r)
+}
+
+// SetReviews es la lista de los comentarios del productos
+func (i *Item) SetReviews(c Comments) {
+	i.reviews = c
+}
+
+// SetSourceStore es el nombre de la tienda de ecommerce donde proviene el producto
+func (i *Item) SetSourceStore(s string) {
+	i.sourceStore = s
+}
+
+// SetURL es la url del producto
+func (i *Item) SetURL(u string) {
+	i.url = u
+}
+
+// SetDetails contiene un diccionario de datos extra del producto que son
+// especificos de la tienda donde se obtine el producto
+func (i *Item) SetDetails(d ProductDetails) {
+	i.details = d
+}
+
+func (i *Item) publicMembers() *product {
+	return &product{
 		ID:          i.id,
 		Name:        i.name,
-		Price:       i.price,
+		Price:       i.price.Float64(),
 		Brand:       i.brand,
 		Description: i.description,
 		Rating:      i.rating,
@@ -226,15 +279,32 @@ func (i *Item) publicMembers() interface{} {
 		URL:         i.url,
 		Details:     i.details,
 	}
-	return tmpStruct
 }
 
 func (i *Item) MarshalJSON() ([]byte, error) {
 	return json.MarshalIndent(i.publicMembers(), "", "\t")
 }
 
+func (i *Item) UnMarshalJSON(data string) error {
+	tmpItem := i.publicMembers()
+	if err := json.Unmarshal([]byte(data), tmpItem); err != nil {
+		return err
+	}
+	i.id = tmpItem.ID
+	i.name = tmpItem.Name
+	i.price = ToCurrency(tmpItem.Price)
+	i.brand = tmpItem.Brand
+	i.description = tmpItem.Description
+	i.rating = tmpItem.Rating
+	i.reviews = tmpItem.Reviews
+	i.sourceStore = tmpItem.SourceStore
+	i.url = tmpItem.URL
+	i.details = tmpItem.Details
+	return nil
+}
+
 func (its Items) MarshalJSON() ([]byte, error) {
-	newList := make([]interface{}, 0)
+	newList := make([]*product, 0)
 	for _, i := range its {
 		newList = append(newList, i.publicMembers())
 	}

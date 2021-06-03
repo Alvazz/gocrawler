@@ -225,6 +225,9 @@ func (s *Scraper) GetAllUrls() {
 
 	// Es el último callback en ejecutarse
 	c.OnScraped(func(r *colly.Response) {
+		/* fmt.Println("finalizo el scraping del producto")
+		productJSON := r.Request.Ctx.Get("Product")
+		fmt.Println("productJSON", productJSON) */
 		s.setSeedURL(r.Request.URL.String())
 	})
 

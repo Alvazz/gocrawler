@@ -1,6 +1,7 @@
 package scraper
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 	"github.com/gocolly/colly"
 	"github.com/leosykes117/gocrawler/internal/logging"
 	"github.com/leosykes117/gocrawler/pkg/item"
+	"golang.org/x/net/html"
 )
 
 // amazon es la estructura que implmenta la interfaz shopCrawler para scrapear
@@ -30,7 +32,6 @@ type amazon struct {
 
 // Detalles del producto:
 // detailBullets_feature_div
-//
 
 // newShopAmazon crea un instancia d la estructura amazon
 func newShopAmazon(options ...func(*shop)) *amazon {
@@ -111,13 +112,24 @@ func (a *amazon) GetMetaTags(onHTML colly.HTMLCallback) (string, colly.HTMLCallb
 // GetProductDetails obtiene los datos del producto de la página
 func (a *amazon) GetProductDetails(onHTML colly.HTMLCallback) (string, colly.HTMLCallback) {
 	return "div#centerCol", func(e *colly.HTMLElement) {
-		title := e.DOM.Find("span.product-title-word-break").Text()
-		title = strings.Trim(title, "\n")
-		fmt.Printf("Titulo: %q\n", title)
+		const (
+			sourceStore = "Amazon"
+		)
+
+		name := e.DOM.Find("span.product-title-word-break").Text()
+		name = strings.Trim(name, "\n")
+		fmt.Printf("Nombre del producto: %q\n", name)
 
 		brand := e.DOM.Find("div#bylineInfo_feature_div a").Text()
 		brand = strings.Trim(brand, "\n")
 		fmt.Printf("Marca: %q\n", brand)
+
+		strStars := strings.Fields(e.DOM.Find("i.a-icon.a-icon-star").Text())[0]
+		fmt.Printf("Calificación: %q\n", strStars)
+		stars, err := strconv.ParseFloat(strStars, 64)
+		if err != nil {
+			logging.ErrorLogger.Printf("Ocurrio un error al convertir la calificación del producto: %v", err)
+		}
 
 		strPrice := e.DOM.
 			Find("div#unifiedPrice_feature_div").
@@ -132,6 +144,25 @@ func (a *amazon) GetProductDetails(onHTML colly.HTMLCallback) (string, colly.HTM
 		price := item.ToCurrency(pricef64)
 		fmt.Printf("Precio: %q\n", price)
 
+		productID, err := item.CreateID(name, sourceStore)
+		if err != nil {
+			logging.ErrorLogger.Fatalf("Ocurrio un error al crear el id del producto %q: %v", productID, err)
+		}
+		itm := item.NewItem(
+			item.ID(productID),
+			item.Name(name),
+			item.Brand(brand),
+			item.Price(pricef64),
+			item.Rating(stars),
+			item.SourceStore(sourceStore),
+			item.URL(e.Request.AbsoluteURL(e.Request.URL.String())),
+		)
+		itmJSON, err := itm.MarshalJSON()
+		if err != nil {
+			logging.ErrorLogger.Fatalf("Ocurrio un error al crear el json del producto %q: %v", productID, err)
+		}
+		e.Request.Ctx.Put("Product", string(itmJSON))
+
 		if onHTML != nil {
 			onHTML(e)
 		}
@@ -143,25 +174,61 @@ func (a *amazon) GetProductInformation(onHTML colly.HTMLCallback) (string, colly
 	classProductDetails := "div#productDetails_feature_div"
 	classDetailBullets := "div#detailBulletsWrapper_feature_div"
 	return fmt.Sprintf("%s, %s", classProductDetails, classDetailBullets), func(e *colly.HTMLElement) {
+		fmt.Println("On GetProductInformation")
 		var (
 			details item.ProductDetails = make(item.ProductDetails)
 		)
-		e.DOM.Find("div#detailBullets_feature_div ul.a-unordered-list li span").Filter(`span.a-text-bold`).Each(func(index int, element *goquery.Selection) {
-			m := regexp.MustCompile(`(?m):|\s{2,}`)
-			keyText := m.ReplaceAllString(element.Text(), "")
-			nextText := strings.TrimSpace(element.Next().Text())
-			details[keyText] = nextText
-			fmt.Printf("%d\t%q:%q\n", index, keyText, nextText)
-		})
+		if e.Attr("id") == "detailBulletsWrapper_feature_div" {
+			getDetailsFromBulletsWrapper(e.DOM, details)
+		} else {
+			getDetails(e.DOM, details)
+		}
 		fmt.Printf("Información del producto: %+q\n", details)
+
+		productJSON := e.Request.Ctx.Get("Product")
+		itm := item.NewItem()
+		err := itm.UnMarshalJSON(productJSON)
+		if err != nil {
+			logging.ErrorLogger.Fatalf("Ocurrio un error al formar el struct del producto %q: %v", itm.GetID(), err)
+		}
+		itm.SetDetails(details)
+		itmJSON, err := itm.MarshalJSON()
+		if err != nil {
+			logging.ErrorLogger.Fatalf("Ocurrio un error al crear el json del producto %q: %v", itm.GetID(), err)
+		}
+		e.Request.Ctx.Put("Product", string(itmJSON))
 	}
 }
 
-// a#customerReviews[href="#"] +
+func getDetailsFromBulletsWrapper(e *goquery.Selection, details item.ProductDetails) {
+	e.Find("div#detailBullets_feature_div ul.a-unordered-list li span").Filter(`span.a-text-bold`).Each(func(index int, element *goquery.Selection) {
+		m := regexp.MustCompile(`(?m):|\s{2,}|\n+`)
+		keyText := m.ReplaceAllString(element.Text(), "")
+		nextText := strings.TrimSpace(element.Next().Text())
+		details[keyText] = nextText
+		fmt.Printf("%d\t%q:%q\n", index, keyText, nextText)
+	})
+}
 
+func getDetails(e *goquery.Selection, details item.ProductDetails) {
+	e.Find(`table.prodDetTable[id*="productDetails"] tr`).Each(func(tableIdx int, row *goquery.Selection) {
+		m := regexp.MustCompile(`(?m):|\s{2,}|\n+`)
+		keyText := m.ReplaceAllString(row.ChildrenFiltered("th").Text(), "")
+		tdNodes := row.ChildrenFiltered("td").Contents()
+		valText := tdNodes.FilterFunction(func(i int, el *goquery.Selection) bool {
+			return el.Is("span") || el.Nodes[0].Type == html.TextNode
+		}).Text()
+		valText = m.ReplaceAllString(valText, "")
+		details[keyText] = valText
+		fmt.Printf("%d\t%q:%q\n", tableIdx, keyText, valText)
+	})
+}
+
+// a#customerReviews[href="#"] +
 // GetProductReviews obtiene los datos de los comentarios hechos por el producto
 func (a *amazon) GetProductReviews(onHTML colly.HTMLCallback) (string, colly.HTMLCallback) {
 	return `a#customer-reviews-content[href="#"] ~ div.a-row`, func(e *colly.HTMLElement) {
+		fmt.Println("On GetProductReviews")
 		var (
 			reviews item.Comments = make(item.Comments, 0)
 		)
@@ -184,6 +251,23 @@ func (a *amazon) GetProductReviews(onHTML colly.HTMLCallback) (string, colly.HTM
 				Stars:   item.Score(stars),
 			})
 		})
-		//fmt.Printf("Comentarios del producto: %v\n", reviews)
+		fmt.Printf("Comentarios del producto: %v\n", reviews)
+
+		productJSON := e.Request.Ctx.Get("Product")
+		itm := item.NewItem()
+		err := itm.UnMarshalJSON(productJSON)
+		if err != nil {
+			logging.ErrorLogger.Fatalf("Ocurrio un error al formar el struct del producto %q: %v", itm.GetID(), err)
+		}
+		itm.SetReviews(reviews)
+		itmJSON, err := itm.MarshalJSON()
+		if err != nil {
+			logging.ErrorLogger.Fatalf("Ocurrio un error al crear el json del producto %q: %v", itm.GetID(), err)
+		}
+		e.Request.Ctx.Put("Product", string(itmJSON))
+
+		if err := a.cacheService.CreateItem(context.Background(), itm); err != nil {
+			logging.ErrorLogger.Fatalf("Ocurrio un error al guardar el producto %s: %v", itm.GetID(), err)
+		}
 	}
 }
