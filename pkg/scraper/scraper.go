@@ -182,7 +182,7 @@ func (s *Scraper) GetAllUrls() {
 		logging.InfoLogger.Printf("OnResponse:\n\tID: %s,\nStartAt: %s", r.Ctx.Get("ID"), strStartAt)
 	})
 
-	funcNames := []string{"ExtractLinks", "GetMetaTags", "GetProductDetails", "GetProductInformation", "GetProductReviews"}
+	funcNames := []string{"ExtractLinks", "GetMetaTags", "GetProductDetails", "GetProductInformation", "GetProductReviews", "DetectCaptcha"}
 	callbacks := []colly.HTMLCallback{
 		func(e *colly.HTMLElement) {
 			link := e.Request.AbsoluteURL(e.Attr("href"))

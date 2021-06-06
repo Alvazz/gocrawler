@@ -80,7 +80,7 @@ func (r *itemRepository) Set(ctx context.Context, item *item.Item) error {
 		if ok {
 			errs = append(errs, fmt.Sprintf("%v", v))
 		} else {
-			fmt.Printf("[%s]Respuesta del comando %d: %v", item.GetID(), i, v)
+			fmt.Printf("[%s]Respuesta del comando %d: %v\n", item.GetID(), i, v)
 		}
 	}
 

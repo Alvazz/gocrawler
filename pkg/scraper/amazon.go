@@ -3,13 +3,17 @@ package scraper
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly"
+	"github.com/leosykes117/gocrawler/internal/fs"
 	"github.com/leosykes117/gocrawler/internal/logging"
+	"github.com/leosykes117/gocrawler/pkg/ciphersuite"
 	"github.com/leosykes117/gocrawler/pkg/item"
 	"golang.org/x/net/html"
 )
@@ -83,6 +87,8 @@ func (a *amazon) HTMLEvents(evts ...string) []OnHTMLEvent {
 		case "GetProductReviews":
 			fmt.Println("Aplicando el evento GetProductReviews")
 			e = a.GetProductReviews
+		case "DetectCaptcha":
+			e = a.DetectCaptcha
 		default:
 			continue
 		}
@@ -116,6 +122,10 @@ func (a *amazon) GetProductDetails(onHTML colly.HTMLCallback) (string, colly.HTM
 			sourceStore = "Amazon"
 		)
 
+		var (
+			stars float64 = 0
+		)
+
 		name := e.DOM.Find("span.product-title-word-break").Text()
 		name = strings.Trim(name, "\n")
 		fmt.Printf("Nombre del producto: %q\n", name)
@@ -124,11 +134,16 @@ func (a *amazon) GetProductDetails(onHTML colly.HTMLCallback) (string, colly.HTM
 		brand = strings.Trim(brand, "\n")
 		fmt.Printf("Marca: %q\n", brand)
 
-		strStars := strings.Fields(e.DOM.Find("i.a-icon.a-icon-star").Text())[0]
+		strStars := e.DOM.Find("i.a-icon.a-icon-star").Text()
 		fmt.Printf("Calificación: %q\n", strStars)
-		stars, err := strconv.ParseFloat(strStars, 64)
-		if err != nil {
-			logging.ErrorLogger.Printf("Ocurrio un error al convertir la calificación del producto: %v", err)
+		starsFields := strings.Fields(strStars)
+		if len(starsFields) > 0 {
+			var err error
+			strStars = starsFields[0]
+			stars, err = strconv.ParseFloat(strStars, 64)
+			if err != nil {
+				logging.ErrorLogger.Printf("Ocurrio un error al convertir la calificación del producto: %v", err)
+			}
 		}
 
 		strPrice := e.DOM.
@@ -268,6 +283,36 @@ func (a *amazon) GetProductReviews(onHTML colly.HTMLCallback) (string, colly.HTM
 
 		if err := a.cacheService.CreateItem(context.Background(), itm); err != nil {
 			logging.ErrorLogger.Fatalf("Ocurrio un error al guardar el producto %s: %v", itm.GetID(), err)
+		}
+	}
+}
+
+func (a *amazon) DetectCaptcha(onHTML colly.HTMLCallback) (string, colly.HTMLCallback) {
+	return "input#captchacharacters", func(e *colly.HTMLElement) {
+		urlMD5, _ := ciphersuite.GetMD5Hash(e.Request.URL.String())
+		fmt.Printf("[%s]Captacha de la página %q[%s]\n", e.Request.Ctx.Get("ID"), e.Request.AbsoluteURL(e.Request.URL.String()), urlMD5)
+		logging.InfoLogger.Printf("[%s]Captacha de la página %q[%s]\n", e.Request.Ctx.Get("ID"), e.Request.AbsoluteURL(e.Request.URL.String()), urlMD5)
+
+		home := fs.GetUserHomeDir()
+		dir, err := filepath.Abs(filepath.Join(home, "./crawling-data/captchas/"))
+		if err != nil {
+			errStr := fmt.Sprintf("Ocurrio un error al crear la ruta del directorio para captchas %q: %v", e.Request.Ctx.Get("ID"), err)
+			fmt.Println(errStr)
+			logging.ErrorLogger.Println(errStr)
+		}
+		captchaFile := fmt.Sprintf("%s-%s-%s", e.Request.URL.Host, e.Request.URL.Path, e.Request.URL.RawQuery) + ".html"
+		fileName := filepath.Join(dir, captchaFile)
+		filePath, err := fs.CreateFile(fileName)
+		if err != nil {
+			errStr := fmt.Sprintf("Ocurrio un error al crear la ruta del archivo captcha %q: %v", e.Request.Ctx.Get("ID"), err)
+			fmt.Println(errStr)
+			logging.ErrorLogger.Println(errStr)
+		}
+		err = ioutil.WriteFile(filePath, e.Response.Body, 0644)
+		if err != nil {
+			errStr := fmt.Sprintf("Ocurrio un error al crear el archivo captcha %q: %v", e.Request.Ctx.Get("ID"), err)
+			fmt.Println(errStr)
+			logging.ErrorLogger.Println(errStr)
 		}
 	}
 }

@@ -11,9 +11,6 @@ type OnHTMLEvent func(colly.HTMLCallback) (string, colly.HTMLCallback)
 
 type shopCrawler interface {
 	HTMLEvents(...string) []OnHTMLEvent
-	GetMetaTags(colly.HTMLCallback) (string, colly.HTMLCallback)
-	GetProductDetails(colly.HTMLCallback) (string, colly.HTMLCallback)
-	ExtractLinks(colly.HTMLCallback) (string, colly.HTMLCallback)
 	GetLinkExtractionQuery() string
 	GetLinkProductQuery() string
 	GetAllowedDomains() []string
