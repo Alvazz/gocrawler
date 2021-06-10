@@ -2,15 +2,17 @@ package scraper
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
-	"math/rand"
 	"net"
 	"net/http"
-	"os/exec"
-	"sort"
+	"strconv"
+	"strings"
 	"time"
+
+	"github.com/PuerkitoBio/goquery"
 )
 
 var vpnServersPool = []string{
@@ -32,12 +34,26 @@ type IPInfo struct {
 	Timezone string `json:"timezone"`
 }
 
+type ProxyInfo struct {
+	IP        string
+	Port      int
+	Country   string
+	Code      string
+	Anonymity string
+	Google    bool
+	SSL       bool
+}
+
+type ProxyList []*ProxyInfo
+
 type Switcher struct {
 	usedServers   []uint
 	currentServer int
 	communIP      *IPInfo
 	vpnIP         *IPInfo
 }
+
+var proxies ProxyList
 
 func NewSwitcher() *Switcher {
 	var ipinfo *IPInfo
@@ -56,71 +72,90 @@ func NewSwitcher() *Switcher {
 	}
 }
 
-func (sw *Switcher) GetCurrentServer() int {
-	return sw.currentServer
-}
-
-func (sw *Switcher) GetUsedServers() []uint {
-	return sw.usedServers
-}
-
-func (sw *Switcher) GetCommunIP() *IPInfo {
-	return sw.communIP
-}
-
-func (sw *Switcher) GetVpnIP() *IPInfo {
-	return sw.vpnIP
-}
-
-func (sw *Switcher) Connect() error {
-	i := -1
-	fmt.Printf("len(usedServers): %v\n", len(sw.usedServers))
-	fmt.Printf("len(vpnServersPool): %v\n", len(vpnServersPool))
-
-	if len(sw.usedServers) == len(vpnServersPool) {
-		log.Println("Reiniciando pool de conexiones")
-		sw.usedServers = make([]uint, 0)
+func GetProxyURLs() error {
+	transport := http.Transport{
+		Dial: func(network, addr string) (net.Conn, error) {
+			return net.DialTimeout(network, addr, time.Duration(5*time.Second))
+		},
 	}
-	for i < len(sw.usedServers) {
-		sw.currentServer = rand.Intn(len(vpnServersPool))
-		fmt.Printf("currentServer: %d\n", sw.currentServer)
-		i = sort.Search(len(sw.usedServers), func(idx int) bool {
-			fmt.Printf("sw.usedServers[idx]: %v\n", sw.usedServers[idx])
-			return uint(sw.currentServer) == sw.usedServers[idx]
+	client := http.Client{
+		Transport: &transport,
+	}
+
+	req, err := http.NewRequest("GET", "https://free-proxy-list.net", nil)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X x.y; rv:42.0) Gecko/20100101 Firefox/42.0")
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
+	req.Header.Set("Accept-Language", "es-US,es-419;q=0.9,es;q=0.8,en;q=0.7")
+	req.Header.Set("DNT", "1")
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9")
+	req.Header.Set("Accept-Encoding", "gzip, deflate, br")
+	req.Header.Set("Cache-Control", "max-age=0")
+	req.Header.Set("Connection", "keep-alive")
+
+	resp, err := client.Get("https://free-proxy-list.net")
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	fmt.Println("Response code", resp.StatusCode)
+
+	if resp.StatusCode == http.StatusOK {
+		/* bodyTex, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Body Response:\n%s\n", string(bodyTex)) */
+
+		doc, err := goquery.NewDocumentFromReader(resp.Body)
+		if err != nil {
+			return err
+		}
+
+		proxies = make(ProxyList, 0)
+		doc.Find("table#proxylisttable tbody tr").Each(func(i int, tableRow *goquery.Selection) {
+			fmt.Println("Iterando en la fila", i)
+			proxyData := tableRow.ChildrenFiltered("td").Map(func(j int, tableCol *goquery.Selection) string {
+				fmt.Println("Columna", j)
+				text := tableCol.Text()
+				fmt.Printf("text: %q\n", text)
+				return text
+			})
+			p, _ := strconv.Atoi(proxyData[1])
+			google := strings.ToLower(proxyData[5]) == "yes"
+			useSecure := strings.ToLower(proxyData[6]) == "yes"
+			prox := &ProxyInfo{
+				IP:        proxyData[0],
+				Port:      p,
+				Code:      proxyData[2],
+				Country:   proxyData[3],
+				Anonymity: proxyData[4],
+				Google:    google,
+				SSL:       useSecure,
+			}
+			proxies = append(proxies, prox)
+			fmt.Printf("ProxyInfo: %v\n", prox)
 		})
-		fmt.Printf("encontrado: %d\n", i)
-	}
-
-	sw.usedServers = append(sw.usedServers, uint(sw.currentServer))
-	configName := vpnServersPool[sw.currentServer]
-
-	fmt.Printf("usedServers: %v\n", sw.usedServers)
-	fmt.Printf("configName: %v\n", configName)
-
-	service := fmt.Sprintf("pia@%s", configName)
-	cmd := exec.Command("systemctl", "start", service)
-	log.Printf("Iniciando conexión VPN a %s", configName)
-	err := cmd.Run()
-	if err != nil {
-		return err
+	} else {
+		return errors.New("La petición para obtener los proxies revolvio un status code erroneo")
 	}
 	return nil
 }
 
-func (sw *Switcher) Disconnect() error {
-	if sw.currentServer == -1 {
-		return nil
+func (list ProxyList) GetURLs() []string {
+	fmt.Println("ProxyList len:", len(list))
+	urls := make([]string, len(list))
+	for i, prox := range list {
+		protocol := "http"
+		if prox.SSL {
+			protocol += "s"
+		}
+		urls[i] = fmt.Sprintf("%s://%s:%d", protocol, prox.IP, prox.Port)
 	}
-	configName := vpnServersPool[sw.currentServer]
-	service := fmt.Sprintf("pia@%s", configName)
-	cmd := exec.Command("systemctl", "stop", service)
-	log.Printf("Deteniendo conexión VPN a %s", configName)
-	err := cmd.Run()
-	if err != nil {
-		return err
-	}
-	sw.currentServer = -1
-	return nil
+	return urls
 }
 
 func IsOnline() (*IPInfo, bool) {
@@ -154,59 +189,4 @@ func IsOnline() (*IPInfo, bool) {
 	}
 	log.Printf("IPResponse: %+v", defaultIP)
 	return &defaultIP, true
-}
-
-func (sw *Switcher) RotateIP() error {
-	if sw.currentServer != -1 {
-		if err := sw.Disconnect(); err != nil {
-			return fmt.Errorf("Error al desconectar la VPN: %v", err)
-		}
-		log.Println("Sin error al desconectar")
-		disconnectCount := 0
-		for {
-			if disconnectCount > 15 {
-				log.Println("Volviendo a desconectar")
-				if err := sw.Disconnect(); err != nil {
-					return fmt.Errorf("Error al desconectar la VPN: %v", err)
-				}
-			}
-			log.Println("Esperando...")
-			time.Sleep(time.Duration(2 * time.Second))
-			log.Println("Comparando conexión e IP")
-			ipinfo, online := IsOnline()
-			if online && ipinfo.IP == sw.GetCommunIP().IP {
-				log.Printf("IP default: %+v", ipinfo)
-				log.Printf("ipinfo.IP: %s\tCommunIP: %s", ipinfo.IP, sw.GetCommunIP().IP)
-				break
-			}
-			log.Println("Aún conectado a la VPN")
-		}
-		log.Println("IP Restablecida")
-	}
-
-	if err := sw.Connect(); err != nil {
-		return fmt.Errorf("Connect error: %v", err)
-	}
-	log.Println("Sin error al conectar")
-	connectCount := 0
-	for {
-		if connectCount > 15 {
-			log.Println("Volviendo a conectar")
-			if err := sw.Connect(); err != nil {
-				return fmt.Errorf("Connect error: %v", err)
-			}
-		}
-		log.Println("Esperando...")
-		time.Sleep(time.Duration(2 * time.Second))
-		log.Println("Comparando conexión e IP")
-		ipinfo, online := IsOnline()
-		if online && ipinfo.IP != sw.GetCommunIP().IP {
-			log.Printf("Nueva IP: %+v", ipinfo)
-			break
-		}
-		log.Println("Sin nueva IP")
-	}
-	log.Println("Nueva IP obtenida con éxito")
-
-	return nil
 }

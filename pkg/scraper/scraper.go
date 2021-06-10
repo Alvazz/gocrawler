@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/gocolly/colly"
+	"github.com/gocolly/colly/debug"
 	"github.com/gocolly/colly/extensions"
 	"github.com/leosykes117/gocrawler/internal/env"
 	"github.com/leosykes117/gocrawler/internal/logging"
@@ -83,6 +84,7 @@ func (s *Scraper) GetAllUrls() {
 		colly.URLFilters(
 			regexp.MustCompile(shop.GetLinkExtractionQuery()),
 		),
+		colly.Debugger(&debug.LogDebugger{}),
 	)
 
 	extensions.Referer(c)

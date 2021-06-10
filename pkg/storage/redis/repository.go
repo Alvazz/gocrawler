@@ -17,6 +17,7 @@ type itemRepository struct {
 	pool *redis.Pool
 }
 
+// NewRepository retorna un objeto que implementa la interfaz item.Cache
 func NewRepository(pool *redis.Pool) item.Cache {
 	return &itemRepository{pool}
 }

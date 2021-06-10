@@ -2,7 +2,7 @@ package itemparser
 
 import (
 	"context"
-	"fmt"
+	"log"
 
 	"github.com/leosykes117/gocrawler/pkg/item"
 )
@@ -33,11 +33,11 @@ func (parser *itemParser) Task() {
 		return
 	}
 
-	fmt.Printf("Analizando los comentarios de %q\n", parser.item.GetID())
+	log.Printf("Analizando los comentarios de %q\n", parser.item.GetID())
 	if len(parser.item.GetReviews()) > 0 {
 		reviewsSentiment := anlz.AnalyzeComments(parser.item.GetID(), parser.item.GetReviews())
 		if len(reviewsSentiment) > 0 {
-			fmt.Printf("reviews of %q: %v\n", parser.item.GetID(), reviewsSentiment)
+			log.Printf("reviews of %q: %v\n", parser.item.GetID(), reviewsSentiment)
 
 		}
 	}
