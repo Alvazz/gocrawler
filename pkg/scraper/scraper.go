@@ -1,8 +1,6 @@
 package scraper
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -16,13 +14,27 @@ import (
 	"time"
 
 	"github.com/gocolly/colly"
+	"github.com/gocolly/colly/debug"
 	"github.com/gocolly/colly/extensions"
 	"github.com/leosykes117/gocrawler/internal/env"
 	"github.com/leosykes117/gocrawler/internal/logging"
 	"github.com/leosykes117/gocrawler/pkg/ciphersuite"
 	"github.com/leosykes117/gocrawler/pkg/item"
-	"github.com/leosykes117/gocrawler/pkg/storage/redis"
 )
+
+func init() {
+	logging.InitLogging()
+	_, ok := os.LookupEnv("GO_CRAWLER_SEEDURL")
+	if !ok {
+		fmt.Println("Leyendo las variables del archivo")
+		if err := env.LoadVars("go_crawler"); err != nil {
+			logging.ErrorLogger.Fatal(err)
+		}
+	}
+	if err := env.ReadVars("go_crawler"); err != nil {
+		logging.ErrorLogger.Fatal(err)
+	}
+}
 
 // Scraper es la clase para crear una instancia de la araña web
 type Scraper struct {
@@ -33,23 +45,9 @@ type Scraper struct {
 	acquiredProducts item.Items
 }
 
-func init() {
-	logging.InitLogging()
-	_, ok := os.LookupEnv("GO_CRAWLER_SEEDURL")
-	if !ok {
-		fmt.Println("Leyendo las variables del archivo")
-		if err := env.LoadVars(); err != nil {
-			logging.ErrorLogger.Fatal(err)
-		}
-	}
-	if err := env.ReadVars(); err != nil {
-		logging.ErrorLogger.Fatal(err)
-	}
-}
-
 // New es el metodo que instancia la clase Scraper
 func New() *Scraper {
-	seedURL, _ := env.GetEnvs(env.SeedURL)
+	seedURL, _ := env.GetCrawlerVars(env.SeedURL)
 	return &Scraper{
 		lock:             &sync.RWMutex{},
 		visitsCount:      0,
@@ -75,16 +73,18 @@ func (s *Scraper) addRequest(rt *requestTracker) {
 
 // GetAllUrls inicia el rasapado de datos
 func (s *Scraper) GetAllUrls() {
-	var shop shopCrawler = newShopMixup()
+	shopDriver := Amazon
+	var shop shopCrawler = shopFactory(shopDriver)
 
 	c := colly.NewCollector(
-		colly.AllowedDomains("https://www.mixup.com.mx", "www.mixup.com.mx", "mixup.com.mx"),
-		//colly.MaxDepth(8),
+		colly.AllowedDomains(shop.GetAllowedDomains()...),
+		//colly.MaxDepth(5),
 		colly.Async(true),
 		colly.UserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X x.y; rv:42.0) Gecko/20100101 Firefox/42.0"),
 		colly.URLFilters(
 			regexp.MustCompile(shop.GetLinkExtractionQuery()),
 		),
+		colly.Debugger(&debug.LogDebugger{}),
 	)
 
 	extensions.Referer(c)
@@ -99,12 +99,12 @@ func (s *Scraper) GetAllUrls() {
 	})
 
 	err := c.Limit(&colly.LimitRule{
-		DomainGlob:  `*mixup.*`,
+		DomainGlob:  shop.GetDomainGlob(),
 		Parallelism: 4,
 		RandomDelay: 6 * time.Second,
 	})
 	if err != nil {
-		logging.ErrorLogger.Printf("Ocurrio un error al establecer los limites para el colector: %v", err)
+		logging.ErrorLogger.Fatalf("Ocurrio un error al establecer los limites para el colector: %v", err)
 	}
 
 	// Se ejecuta antes de realizar la solicitud
@@ -129,7 +129,7 @@ func (s *Scraper) GetAllUrls() {
 		}
 		logging.ErrorLogger.Printf("OnError:%s\n\tID: %s,\n\tStartAt: %s", e, r.Ctx.Get("ID"), strStartAt)
 
-		debugReq, err := env.GetEnvs(env.DebugRequests)
+		debugReq, err := env.GetCrawlerVars(env.DebugRequests)
 		if err != nil {
 			logging.ErrorLogger.Printf("Error la obtener la bandera de debug")
 		}
@@ -154,7 +154,7 @@ func (s *Scraper) GetAllUrls() {
 		re := regexp.MustCompile(shop.GetLinkExtractionQuery())
 		url := r.Request.URL.String()
 		if !re.MatchString(url) && !strings.Contains(url, "?sku=") {
-			logging.WarningLogger.Printf("La URL no cumple las reglas para ser visitada: %s", url)
+			logging.WarningLogger.Printf("OnResponse. La URL no cumple las reglas para ser visitada: %s", url)
 			return
 		}
 		reqID := r.Ctx.Get("ID")
@@ -163,7 +163,7 @@ func (s *Scraper) GetAllUrls() {
 		if err != nil {
 			logging.WarningLogger.Printf("Error al parsear la fecha: %v", err)
 		}
-		debugReq, err := env.GetEnvs(env.DebugRequests)
+		debugReq, err := env.GetCrawlerVars(env.DebugRequests)
 		if err != nil {
 			logging.ErrorLogger.Printf("Error la obtener la bandera de debug")
 		}
@@ -184,17 +184,10 @@ func (s *Scraper) GetAllUrls() {
 		logging.InfoLogger.Printf("OnResponse:\n\tID: %s,\nStartAt: %s", r.Ctx.Get("ID"), strStartAt)
 	})
 
-	// Se ejecuta justo después de OnResponse si el contenido recibido es HTML
-	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
-		link := e.Attr("href")
-		if link == "" {
-			logging.WarningLogger.Println("No se encontro el link")
-		} else {
-			link = e.Request.AbsoluteURL(link)
-			re := regexp.MustCompile(shop.GetLinkExtractionQuery())
-			if !re.MatchString(link) {
-				logging.WarningLogger.Printf("La URL no cumple las reglas para ser visitada: %s", link)
-			}
+	funcNames := []string{"ExtractLinks", "GetMetaTags", "GetProductDetails", "GetProductInformation", "GetProductReviews", "DetectCaptcha"}
+	callbacks := []colly.HTMLCallback{
+		func(e *colly.HTMLElement) {
+			link := e.Request.AbsoluteURL(e.Attr("href"))
 			siteCookies := c.Cookies(link)
 			if err := c.SetCookies(link, siteCookies); err != nil {
 				logging.ErrorLogger.Println("SET COOKIES ERROR: ", err)
@@ -204,18 +197,39 @@ func (s *Scraper) GetAllUrls() {
 			if err != nil {
 				logging.ErrorLogger.Printf("[%s][%s]Ocurrio un error al crear la petición: %v", e.Request.Ctx.Get("ID"), e.Request.AbsoluteURL(link), err)
 			}
+		},
+	}
+	events := shop.HTMLEvents(funcNames...)
+	for i, e := range events {
+		if i >= len(callbacks) {
+			c.OnHTML(e(nil))
+		} else {
+			c.OnHTML(e(callbacks[i]))
 		}
-	})
+	}
 
-	c.OnHTML("html", shop.GetMetaTags)
-	c.OnHTML("div.detail", func(e *colly.HTMLElement) {
-		if strings.Contains(e.Request.URL.RawQuery, "sku=") {
-			shop.GetProductDetails(e, s)
+	// Se ejecuta justo después de OnResponse si el contenido recibido es HTML
+	/* c.OnHTML(shop.ExtractLinks(func(e *colly.HTMLElement) {
+		link := e.Attr("href")
+		siteCookies := c.Cookies(link)
+		if err := c.SetCookies(link, siteCookies); err != nil {
+			logging.ErrorLogger.Println("SET COOKIES ERROR: ", err)
 		}
-	})
+		s.visitsCount++
+		err := c.Visit(link)
+		if err != nil {
+			logging.ErrorLogger.Printf("[%s][%s]Ocurrio un error al crear la petición: %v", e.Request.Ctx.Get("ID"), e.Request.AbsoluteURL(link), err)
+		}
+	}))
+	c.OnHTML("html", shop.GetMetaTags)
+	c.OnHTML("div.detail", shop.GetProductDetails)
+	c.OnHTML("div#centerCol", shop.GetProductDetails) */
 
 	// Es el último callback en ejecutarse
 	c.OnScraped(func(r *colly.Response) {
+		/* fmt.Println("finalizo el scraping del producto")
+		productJSON := r.Request.Ctx.Get("Product")
+		fmt.Println("productJSON", productJSON) */
 		s.setSeedURL(r.Request.URL.String())
 	})
 
@@ -226,40 +240,19 @@ func (s *Scraper) GetAllUrls() {
 		logging.ErrorLogger.Printf("Ocurrio un error al crear la petición de la URL semilla: %v", err)
 	}
 	c.Wait()
-	logging.InfoLogger.Println("Escribiendo los resultados")
 
-	err = env.SetEnv(env.SeedURL, s.seedURL)
+	debugReq, err := env.GetCrawlerVars(env.DebugRequests)
 	if err != nil {
-		fmt.Printf("Error al escribir la última URL visitada: %v", err)
-	}
-
-	err = env.WriteVars()
-	if err != nil {
-		fmt.Printf("Error al escribir el archivo .env: %v", err)
+		logging.ErrorLogger.Printf("Error la obtener la bandera de debug")
 	}
 
-	filename, err := getFilePath("products.json")
-	if err != nil {
-		logging.ErrorLogger.Fatalf("Ocurrio un error al crear el archivo: %v", err)
+	if ok := debugReq.(bool); ok {
+		logging.InfoLogger.Println("Escribiendo los resultados")
+		s.SaveScrapingData()
+	} else {
+		logging.InfoLogger.Println("Sin guardar la información del scraping")
 	}
-	err = s.saveProducts(filename)
-	if err != nil {
-		logging.ErrorLogger.Fatalf("Ocurrio un error al escribir los elementos en el archivo: %v", err)
-	}
-	logging.InfoLogger.Printf("Archivo creado en %s\n", filename)
 
-	requestsJSON, err := s.requests.MarshalJSON()
-	if err != nil {
-		logging.ErrorLogger.Fatalf("Ocurrio un error al hacer Marshal de las solicitudes:\n%v", err)
-	}
-	jsonFile, err := getFilePath("scraping_request.json")
-	if err != nil {
-		logging.ErrorLogger.Fatalf("Ocurrio un error al crear la ruta del archivo json: %v", err)
-	}
-	err = ioutil.WriteFile(jsonFile, requestsJSON, 0600)
-	if err != nil {
-		logging.ErrorLogger.Fatalf("Ocurrio un error al crear el archivo json: %v", err)
-	}
 }
 
 // getFilePath Crear la ruta del donde escribir el archivo
@@ -287,29 +280,41 @@ func getFilePath(filename string) (string, error) {
 	return filepath.Join(dir, filename), nil
 }
 
-// saveUrls escribe en un archivo los productos obtenidos
-func (s *Scraper) saveProducts(filePath string) error {
-	if len(s.acquiredProducts) > 0 {
-		f, err := os.Create(filePath)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		jsonProducts, err := json.MarshalIndent(s.acquiredProducts, "", "\t")
-		if err != nil {
-			return err
-		}
-		_, err = f.Write(jsonProducts)
-		if err != nil {
-			return err
-		}
-		endpoint, _ := env.GetEnvs(env.RedisEndpoint)
-		repo := redis.NewRepository(redis.NewConn(endpoint.(string)))
-		for _, product := range s.acquiredProducts {
-			if err := repo.CreateItem(context.Background(), product); err != nil {
-				logging.ErrorLogger.Fatalf("Ocurrio un error al guardar el producto %s: %v", product.ID, err)
-			}
-		}
+func (s *Scraper) SaveScrapingData() {
+	if err := s.saveLastURL(); err != nil {
+		fmt.Println(err)
+	}
+
+	if err := s.saveScrapingRequest(); err != nil {
+		logging.ErrorLogger.Fatal(err)
+	}
+}
+
+func (s *Scraper) saveLastURL() error {
+	err := env.SetCrawlerVars(env.SeedURL, s.seedURL)
+	if err != nil {
+		return fmt.Errorf("Error al escribir la última URL visitada: %v", err)
+	}
+
+	err = env.WriteVars("go_crawler")
+	if err != nil {
+		return fmt.Errorf("Error al escribir el archivo .env: %v", err)
+	}
+	return nil
+}
+
+func (s *Scraper) saveScrapingRequest() error {
+	requestsJSON, err := s.requests.MarshalJSON()
+	if err != nil {
+		return fmt.Errorf("Ocurrio un error al hacer Marshal de las solicitudes:\n%v", err)
+	}
+	jsonFile, err := getFilePath("scraping_request.json")
+	if err != nil {
+		return fmt.Errorf("Ocurrio un error al crear la ruta del archivo json: %v", err)
+	}
+	err = ioutil.WriteFile(jsonFile, requestsJSON, 0600)
+	if err != nil {
+		return fmt.Errorf("Ocurrio un error al crear el archivo json: %v", err)
 	}
 	return nil
 }

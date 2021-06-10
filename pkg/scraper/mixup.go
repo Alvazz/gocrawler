@@ -6,57 +6,112 @@ import (
 	"strings"
 
 	"github.com/gocolly/colly"
-	"github.com/leosykes117/gocrawler/internal/env"
 	"github.com/leosykes117/gocrawler/internal/logging"
 	"github.com/leosykes117/gocrawler/pkg/item"
-	"github.com/leosykes117/gocrawler/pkg/storage/redis"
 )
 
 type mixup struct {
 	shop
-	categoryLinkPattern string
-	productLinkPatter   string
 }
 
-// NewShopMixup crea un instancia de la estructura mixup
-func newShopMixup() *mixup {
-	return &mixup{
+// NewShopMixup crea un instancia d la estructura mixup
+func newShopMixup(options ...func(*shop)) *mixup {
+	m := &mixup{
 		shop: shop{
+			domainGlob:          `*mixup.*`,
 			topLevelDomain:      "mixup.com",
 			keywordsValue:       "Keywords",
 			descriptionValue:    "Description",
 			linkExtractionQuery: `(?m)https://www\.mixup\.com\.mx/[Mm]ixup/(([Hh]ome\.aspx)|((Categoria|Productos)\.aspx\?(etq\=))|(detproducto\.aspx\?sku=\d+)$)`,
 			linkProductQuery:    `(?m)(https://www\.mixup\.com\.mx/[Mm]ixup/)(detproducto\.aspx\?sku=\d{12,})$`,
-			//linkExtractionQuery: `(?m)(https://www\.mixup\.com\.mx/[Mm]ixup/)(Categoria|Productos)\.aspx\?(etq\=)`,
+			allowedDomains: []string{
+				"https://www.mixup.com.mx",
+				"www.mixup.com.mx",
+				"mixup.com.mx",
+			},
 		},
 	}
+
+	for _, f := range options {
+		f(&m.shop)
+	}
+	return m
 }
 
-// GetCategoryLinkPattern retorna el valor de mixup.categoryLinkPattern
-func (m *mixup) GetCategoryLinkPattern() string {
-	return m.categoryLinkPattern
+func (m *mixup) HTMLEvents(evts ...string) []OnHTMLEvent {
+	events := make([]OnHTMLEvent, 0)
+	for _, funcName := range evts {
+		var e OnHTMLEvent
+		switch funcName {
+		case "GetMetaTags":
+			e = m.GetMetaTags
+		case "ExtractLinks":
+			e = m.ExtractLinks
+		case "GetProductDetails":
+			e = m.GetProductDetails
+		default:
+			continue
+		}
+		events = append(events, e)
+	}
+	return events
 }
 
 // GetMetaTags obtiene el contenido de las etiquetas <meta> de la página web
-func (m *mixup) GetMetaTags(e *colly.HTMLElement) {
-	reqID := e.Request.Ctx.Get("ID")
-	logging.InfoLogger.Println("Obteniedo las etiquetas meta[", reqID, "]")
-	property := e.ChildAttr(`meta[property="og:image"]`, "content")
-	imageURL := e.ChildAttr(`meta[name="twitter:image"]`, "content")
-	keywords := e.ChildAttr(`meta[name="Description"]`, "content")
-	description := e.ChildAttr(`meta[name="Keywords"]`, "content")
-	logging.InfoLogger.Printf("[%s]Property: %s", reqID, property)
-	logging.InfoLogger.Printf("[%s]Twitter: %s", reqID, imageURL)
-	logging.InfoLogger.Printf("[%s]Keywords: %s", reqID, keywords)
-	logging.InfoLogger.Printf("[%s]Description: %s", reqID, description)
+func (m *mixup) GetMetaTags(onHTML colly.HTMLCallback) (string, colly.HTMLCallback) {
+	return "html", func(e *colly.HTMLElement) {
+		reqID := e.Request.Ctx.Get("ID")
+		logging.InfoLogger.Println("Obteniedo las etiquetas meta[", reqID, "]")
+		property := e.ChildAttr(`meta[property="og:image"]`, "content")
+		imageURL := e.ChildAttr(`meta[name="twitter:image"]`, "content")
+		keywords := e.ChildAttr(`meta[name="Description"]`, "content")
+		description := e.ChildAttr(`meta[name="Keywords"]`, "content")
+		logging.InfoLogger.Printf("[%s]Property: %s", reqID, property)
+		logging.InfoLogger.Printf("[%s]Twitter: %s", reqID, imageURL)
+		logging.InfoLogger.Printf("[%s]Keywords: %s", reqID, keywords)
+		logging.InfoLogger.Printf("[%s]Description: %s", reqID, description)
+		if onHTML != nil {
+			onHTML(e)
+		}
+	}
 }
 
-// GetProductDetails obtiene los datos del producto de la página
-func (m *mixup) GetProductDetails(e *colly.HTMLElement, s *Scraper) {
+func (m *mixup) ExtractLinks(onHTML colly.HTMLCallback) (string, colly.HTMLCallback) {
+	return "a[href]", func(e *colly.HTMLElement) {
+		link := e.Attr("href")
+		if link == "" {
+			logging.WarningLogger.Println("No se encontro el link")
+		} else {
+			link = e.Request.AbsoluteURL(link)
+			re := regexp.MustCompile(m.linkExtractionQuery)
+			if !re.MatchString(link) {
+				logging.WarningLogger.Printf("La URL no cumple las reglas para ser visitada: %s", link)
+			}
+			if onHTML != nil {
+				onHTML(e)
+			}
+		}
+	}
+}
+
+// GetProductDetails es el callback OnHTML de colly para obtener los detalles del producto
+func (m *mixup) GetProductDetails(onHTML colly.HTMLCallback) (string, colly.HTMLCallback) {
+	return "div.detail", func(e *colly.HTMLElement) {
+		if strings.Contains(e.Request.URL.RawQuery, "sku=") {
+			m.productDetails(e)
+			if onHTML != nil {
+				onHTML(e)
+			}
+		}
+	}
+}
+
+// productDetails busca los detalles del producto en el página obtenida
+func (m *mixup) productDetails(e *colly.HTMLElement) {
 	var (
 		detailCount                                int = 0
 		name, brand, description, sourceStore, url string
-		rating                                     item.Score
+		rating                                     float64
 		reviews                                    item.Comments       = make(item.Comments, 0)
 		details                                    item.ProductDetails = make(item.ProductDetails)
 	)
@@ -92,84 +147,24 @@ func (m *mixup) GetProductDetails(e *colly.HTMLElement, s *Scraper) {
 
 	description = e.DOM.Parent().NextAllFiltered("div.productcontent").Find("div#tabs-res").Text()
 	description = strings.TrimSpace(description)
+	productID, err := item.CreateID(name, sourceStore)
+	if err != nil {
+		logging.ErrorLogger.Fatalf("Ocurrio un error al crear el id del producto %q: %v", productID, err)
+	}
 
 	product := item.NewItem(
-		name,
-		brand,
-		description,
-		sourceStore,
-		url,
-		rating,
-		reviews,
-		details,
+		item.ID(productID),
+		item.Name(name),
+		item.Brand(brand),
+		item.Description(description),
+		item.SourceStore(sourceStore),
+		item.URL(url),
+		item.Rating(rating),
+		item.Reviews(reviews),
+		item.Details(details),
 	)
 
-	endpoint, _ := env.GetEnvs(env.RedisEndpoint)
-	repo := redis.NewRepository(redis.NewConn(endpoint.(string)))
-	if err := repo.CreateItem(context.Background(), product); err != nil {
-		logging.ErrorLogger.Fatalf("Ocurrio un error al guardar el producto %s: %v", product.ID, err)
+	if err := m.cacheService.CreateItem(context.Background(), product); err != nil {
+		logging.ErrorLogger.Fatalf("Ocurrio un error al guardar el producto %s: %v", product.GetID(), err)
 	}
-
-	/* s.acquiredProducts = append(s.acquiredProducts, item.NewItem(
-		name,
-		brand,
-		description,
-		sourceStore,
-		url,
-		rating,
-		reviews,
-		details,
-	)) */
 }
-
-/* func (m *mixup) GetProductData(e *colly.HTMLElement) {
-	if !strings.Contains(e.Request.URL.RawQuery, "sku=") {
-		return
-	}
-	reqID := e.Request.Ctx.Get("ID")
-	productData := make(map[int][]string)
-
-	deleteSpaces := func(s *string) {
-		manySpace := regexp.MustCompile(`(?m)( {2,})`)
-		*s = manySpace.ReplaceAllString(*s, " ")
-		divider := regexp.MustCompile(`(?m)(\r\n|\r|\n)+`)
-		*s = divider.ReplaceAllString(*s, "")
-		*s = strings.TrimSpace(*s)
-	}
-
-	brandProduct := e.ChildText(`div[class*="titulo"]`)
-	deleteSpaces(&brandProduct)
-	logging.InfoLogger.Printf("[%s]Marca y Productos: %s", reqID, brandProduct)
-
-	productDOM := e.DOM
-	prevTag := ""
-	tagID := 0
-	productDOM.Contents().Each(func(i int, element *goquery.Selection) {
-		nodeType := goquery.NodeName(element)
-		if nodeType == "span" && element.HasClass("bold") {
-			key := element.Text()
-			deleteSpaces(&key)
-			if key != "" {
-				productData[tagID] = make([]string, 2)
-				productData[tagID][0] = key
-				prevTag = "span"
-				logging.InfoLogger.Printf("%d[%d]#span: %s", i, tagID, element.Text())
-			}
-		} else if prevTag == "span" && nodeType == "#text" {
-			logging.InfoLogger.Printf("[%d]#text: %s", tagID, element.Text())
-			value := element.Text()
-			deleteSpaces(&value)
-			if value != "" {
-
-				if _, ok := productData[tagID]; !ok {
-					productData[tagID] = make([]string, 2)
-				}
-				productData[tagID][1] = value
-				tagID++
-			}
-		} else {
-			logging.InfoLogger.Printf("[%d]<%s>:%s</%s>", i, nodeType, element.Text(), nodeType)
-		}
-	})
-	logging.InfoLogger.Printf("[%s]Descripción:\n\t%+v", reqID, productData)
-} */

@@ -9,43 +9,47 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
-	"github.com/leosykes117/gocrawler/internal/logging"
-)
-
-type GoCrawlerSpecification struct {
-	RedisEndpoint string `envconfig:"GO_CRAWLER_REDIS_ENDPOINT"`
-	RedisPort     string `envconfig:"GO_CRAWLER_REDIS_PORT"`
-	DebugRequests bool   `envconfig:"GO_CRAWLER_DEBUG_REQUESTS"`
-	SeedURL       string `envconfig:"GO_CRAWLER_SEEDURL"`
-}
-
-const (
-	RedisEndpoint = "REDIS_ENDPOINT"
-	RedisPort     = "REDIS_PORT"
-	DebugRequests = "DEBUG_REQUESTS"
-	SeedURL       = "SEEDURL"
 )
 
 var (
-	crawlerEnvVars GoCrawlerSpecification
-	envFilePath    string
+	envFiles map[string]string = map[string]string{
+		"go_crawler": "",
+		"aws":        "",
+	}
 )
 
 // LoadVars carga el archivo .env en variables de ambiente
-func LoadVars() error {
-	var err error
+func LoadVars(filenames ...string) error {
+	var (
+		err          error
+		envFilePaths = make([]string, 0)
+	)
 	projectPath, ok := os.LookupEnv("PROJECTPATH")
 	if !ok {
 		return fmt.Errorf("%s no establecida", "PROJECTPATH")
 	}
+
 	fmt.Printf("%s=%s\n", "PROJECTPATH", projectPath)
-	envFilePath, err = filepath.Abs(filepath.Join(projectPath, "./.env"))
-	if err != nil {
-		return fmt.Errorf("Error al obtener la ruta del archivo .env: %v", err)
+
+	if filenames == nil || len(filenames) < 1 {
+		filenames, err = getAllEnvFiles(projectPath)
+		if err != nil {
+			return err
+		}
+		envFiles = map[string]string{}
 	}
 
-	fmt.Println("envFilePath", envFilePath)
-	err = godotenv.Load(envFilePath)
+	for _, file := range filenames {
+		filePath, err := filepath.Abs(filepath.Join(projectPath, fmt.Sprintf("./.%s.env", file)))
+		if err != nil {
+			return fmt.Errorf("Error al obtener la ruta del archivo .env: %v", err)
+		}
+		envFilePaths = append(envFilePaths, filePath)
+		envFiles[file] = filePath
+	}
+
+	fmt.Println("envFilePath", envFilePaths)
+	err = godotenv.Load(envFilePaths...)
 	if err != nil {
 		return fmt.Errorf("Error al leer el archivo .env: %v", err)
 	}
@@ -53,52 +57,61 @@ func LoadVars() error {
 }
 
 // ReadVars obtiene el valor de las variables de ambiente
-func ReadVars() error {
-	err := envconfig.Process("go_crawler", &crawlerEnvVars)
-	if err != nil {
-		return fmt.Errorf("Error al leer las variables: %v", err)
+func ReadVars(envarprefixes ...string) error {
+	var (
+		i interface{}
+	)
+	if len(envarprefixes) == 0 {
+		for k := range envFiles {
+			envarprefixes = append(envarprefixes, k)
+		}
+	}
+	fmt.Println("envarprefixes", envarprefixes)
+	for _, prefix := range envarprefixes {
+		switch prefix {
+		case "go_crawler":
+			i = &crawlerEnvVars
+		case "aws":
+			i = &awsEnvVars
+		default:
+			return fmt.Errorf("No existe la configuración %s", prefix)
+		}
+		err := envconfig.Process(prefix, i)
+		if err != nil {
+			return fmt.Errorf("Error al leer las variables: %v", err)
+		}
 	}
 	return nil
 }
 
-func WriteVars() error {
-	mapVars := toMap()
-	logging.InfoLogger.Printf(".env filepath: %s", envFilePath)
-	err := godotenv.Write(mapVars, envFilePath)
-	if err != nil {
-		return fmt.Errorf("Error al escribir el archivo .env: %v", err)
+func WriteVars(envar ...string) error {
+	var (
+		mapVars map[string]string
+	)
+	if envar == nil || len(envar) == 0 {
+		for k, _ := range envFiles {
+			envar = append(envar, k)
+		}
+	}
+	for _, file := range envar {
+		switch file {
+		case "go_crawler":
+			mapVars = toMap(crawlerEnvVars)
+		case "aws":
+			mapVars = toMap(awsEnvVars)
+		default:
+			return fmt.Errorf("No existe la configuración %s", file)
+		}
+		err := godotenv.Write(mapVars, envFiles[file])
+		if err != nil {
+			return fmt.Errorf("Error al escribir el archivo .env: %v", err)
+		}
 	}
 	return nil
 }
 
-// GetEnvs devuelve el valor de la variable de ambiente especificada en envar
-func GetEnvs(envar string) (interface{}, error) {
-	switch envar {
-	case RedisEndpoint:
-		return crawlerEnvVars.RedisEndpoint, nil
-	case RedisPort:
-		return crawlerEnvVars.RedisPort, nil
-	case DebugRequests:
-		return crawlerEnvVars.DebugRequests, nil
-	case SeedURL:
-		return crawlerEnvVars.SeedURL, nil
-	default:
-		return "", fmt.Errorf("No existe la variable %s", envar)
-	}
-}
-
-func SetEnv(envar string, val interface{}) error {
-	switch envar {
-	case SeedURL:
-		crawlerEnvVars.SeedURL = val.(string)
-	default:
-		return fmt.Errorf("No se puede modificar el valor de %s", envar)
-	}
-	return nil
-}
-
-func toMap() map[string]string {
-	v := reflect.ValueOf(crawlerEnvVars)
+func toMap(i interface{}) map[string]string {
+	v := reflect.ValueOf(i)
 	typeOfS := v.Type()
 	vars := make(map[string]string)
 	for i := 0; i < v.NumField(); i++ {
@@ -107,4 +120,23 @@ func toMap() map[string]string {
 		vars[name] = fmt.Sprint(v.Field(i).Interface())
 	}
 	return vars
+}
+
+func getAllEnvFiles(root string) ([]string, error) {
+	var files []string
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if !info.IsDir() && filepath.Ext(info.Name()) == ".env" {
+			filename := info.Name()
+			filename = filename[1 : len(filename)-len(filepath.Ext(filename))]
+			files = append(files, filename)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	for i, file := range files {
+		fmt.Printf("%d: %s\n", i, file)
+	}
+	return files, nil
 }

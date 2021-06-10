@@ -13,26 +13,14 @@ provider:
     role:
       name: comparison-shopping-role
       path: /dev-service-role/lambda/
+      statements:
+        - Effect: 'Allow'
+          Action: 'comprehend:*'
+          Resource: '*'
 
   environment:
-    GO_CRAWLER_REDIS_ENDPOINT: comparison-shopping-cache.qlaosm.0001.use1.cache.amazonaws.com:6379
+    GO_CRAWLER_REDIS_ENDPOINT: comparison-shopping-cache.qlaosm.0001.use1.cache.amazonaws.com
     GO_CRAWLER_REDIS_PORT: 6379
-
-# you can add statements to the Lambda function's IAM Role here
-#  iamRoleStatements:
-#    - Effect: "Allow"
-#      Action:
-#        - "s3:ListBucket"
-#      Resource: { "Fn::Join" : ["", ["arn:aws:s3:::", { "Ref" : "ServerlessDeploymentBucket" } ] ]  }
-#    - Effect: "Allow"
-#      Action:
-#        - "s3:PutObject"
-#      Resource:
-#        Fn::Join:
-#          - ""
-#          - - "arn:aws:s3:::"
-#            - "Ref" : "ServerlessDeploymentBucket"
-#            - "/*"
 
 package:
   individually: true
@@ -43,33 +31,19 @@ functions:
   parser:
     handler: bin/parser
     description: Obtiene los productos almacenados en Redis y envía sus comentarios a Comprehend
-    timeout: 600 
+    timeout: 150
     memorySize: 512
     vpc:
       securityGroupIds:
-        - sg-04f3f3b446ccc4867
+        - sg-02efda80b254c4eaa
       subnetIds:
         - subnet-05c2681596ea123fb
     events:
       - schedule:
           rate: rate(3 minutes)
           enabled: false
+    environment:
+      AWS_CONFIG_REGION: ${self:provider.region}
     package:
       patterns:
         - './bin/parser'
-
-#    Define function environment variables here
-#    environment:
-#      variable2: value2
-
-# you can add CloudFormation resource templates here
-#resources:
-#  Resources:
-#    NewResource:
-#      Type: AWS::S3::Bucket
-#      Properties:
-#        BucketName: my-new-bucket
-#  Outputs:
-#     NewOutput:
-#       Description: "Description for the output"
-#       Value: "Some output value"
