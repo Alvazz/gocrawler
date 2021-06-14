@@ -41,7 +41,7 @@ func (r *itemRepository) Set(ctx context.Context, item *item.Item) error {
 		return err
 	}
 	// SE CREA EL HASH PRINCIPAL PARA ALMACENAR EL PRODUCTO
-	err = conn.Send("HMSET", productKey, "id", productID, "name", item.GetName(), "brand", item.GetBrand(), "description", item.GetDescription(), "score", item.GetRating(), "reviews", commentsKey, "sourceStore", item.GetSourceStore(), "url", item.GetURL(), "details", detailsKey)
+	err = conn.Send("HMSET", productKey, "id", productID, "name", item.GetName(), "brand", item.GetBrand(), "description", item.GetDescription(), "price", item.GetPrice(), "score", item.GetRating(), "reviews", commentsKey, "sourceStore", item.GetSourceStore(), "url", item.GetURL(), "details", detailsKey)
 	if err != nil {
 		return err
 	}
@@ -95,7 +95,7 @@ func (r *itemRepository) Set(ctx context.Context, item *item.Item) error {
 func (r *itemRepository) Get(ctx context.Context, ID string) (*item.Item, error) {
 	var (
 		id, name, brand, description, sourceStore, url string
-		rating                                         float64
+		rating, price                                  float64
 		reviews                                        item.Comments
 		details                                        item.ProductDetails
 		err                                            error
@@ -122,6 +122,8 @@ func (r *itemRepository) Get(ctx context.Context, ID string) (*item.Item, error)
 			brand = v
 		case "description":
 			description = v
+		case "price":
+			price, _ = strconv.ParseFloat(v, 64)
 		case "sourceStore":
 			sourceStore = v
 		case "url":
@@ -146,6 +148,7 @@ func (r *itemRepository) Get(ctx context.Context, ID string) (*item.Item, error)
 		item.Name(name),
 		item.Brand(brand),
 		item.Description(description),
+		item.Price(price),
 		item.SourceStore(sourceStore),
 		item.URL(url),
 		item.Rating(rating),

@@ -157,6 +157,7 @@ func (m *mixup) productDetails(e *colly.HTMLElement) {
 		item.Name(name),
 		item.Brand(brand),
 		item.Description(description),
+		item.Price(0),
 		item.SourceStore(sourceStore),
 		item.URL(url),
 		item.Rating(rating),

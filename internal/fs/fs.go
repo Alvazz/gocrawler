@@ -40,3 +40,14 @@ func GetUserHomeDir() string {
 	}
 	return home
 }
+
+func Abs(file string) string {
+	if filepath.IsAbs(file) {
+		return file
+	}
+	fileAbs, err := filepath.Abs(file)
+	if err != nil {
+		return ""
+	}
+	return fileAbs
+}
