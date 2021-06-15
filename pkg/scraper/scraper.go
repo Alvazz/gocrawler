@@ -73,7 +73,7 @@ func (s *Scraper) addRequest(rt *requestTracker) {
 
 // GetAllUrls inicia el rasapado de datos
 func (s *Scraper) GetAllUrls() {
-	shopDriver := Amazon
+	shopDriver := Mixup
 	var shop shopCrawler = shopFactory(shopDriver)
 
 	c := colly.NewCollector(
@@ -184,7 +184,7 @@ func (s *Scraper) GetAllUrls() {
 		logging.InfoLogger.Printf("OnResponse:\n\tID: %s,\nStartAt: %s", r.Ctx.Get("ID"), strStartAt)
 	})
 
-	funcNames := []string{"ExtractLinks", "GetMetaTags", "GetProductDetails", "GetProductInformation", "GetProductReviews", "DetectCaptcha"}
+	funcNames := []string{"ExtractLinks", "GetMetaTags", "GetProductDetails", "GetProductInformation", "GetProductReviews", "DetectCaptcha", "GetProductPrice"}
 	callbacks := []colly.HTMLCallback{
 		func(e *colly.HTMLElement) {
 			link := e.Request.AbsoluteURL(e.Attr("href"))

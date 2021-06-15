@@ -2,9 +2,12 @@ package scraper
 
 import (
 	"context"
+	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
+	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly"
 	"github.com/leosykes117/gocrawler/internal/logging"
 	"github.com/leosykes117/gocrawler/pkg/item"
@@ -49,6 +52,8 @@ func (m *mixup) HTMLEvents(evts ...string) []OnHTMLEvent {
 			e = m.ExtractLinks
 		case "GetProductDetails":
 			e = m.GetProductDetails
+		case "GetProductPrice":
+			e = m.GetProductPrice
 		default:
 			continue
 		}
@@ -99,6 +104,63 @@ func (m *mixup) GetProductDetails(onHTML colly.HTMLCallback) (string, colly.HTML
 	return "div.detail", func(e *colly.HTMLElement) {
 		if strings.Contains(e.Request.URL.RawQuery, "sku=") {
 			m.productDetails(e)
+			if onHTML != nil {
+				onHTML(e)
+			}
+		}
+	}
+}
+
+// GetProductPrice es el callback OnHTML de colly para obtener el precio del producto del sitio Mixup
+func (m *mixup) GetProductPrice(onHTML colly.HTMLCallback) (string, colly.HTMLCallback) {
+	return "div.actions", func(e *colly.HTMLElement) {
+		if strings.Contains(e.Request.URL.RawQuery, "sku=") {
+			spaceCleaner := regexp.MustCompile(`(?m)( {2,})`)
+			var price item.Currency
+			e.DOM.Find("span.preciolistaNewDet, span.precioofertaNewDet").Each(func(i int, span *goquery.Selection) {
+				if span.HasClass("descartado") {
+					return
+				}
+
+				var textPrice string
+				spanText := span.Text()
+
+				textSlice := strings.Split(spanText, ":")
+				if len(textSlice) > 1 {
+					textPrice = textSlice[1]
+				}
+				textPrice = spaceCleaner.ReplaceAllString(textPrice, "")
+				textPrice = strings.TrimSpace(textPrice)
+
+				if len(textPrice) == 0 {
+					return
+				}
+
+				replacer := strings.NewReplacer("$", "", ",", "")
+				textPrice = replacer.Replace(textPrice)
+				pricef64, err := strconv.ParseFloat(textPrice, 64)
+				if err != nil {
+					logging.ErrorLogger.Printf("Ocurrio un error al parsear el texto del precio: %v", err)
+					fmt.Printf("Ocurrio un error al parsear el texto del precio: %v\n", err)
+				}
+				price = item.ToCurrency(pricef64)
+			})
+
+			productJSON := e.Request.Ctx.Get("Product")
+			itm := item.NewItem()
+			err := itm.UnMarshalJSON(productJSON)
+			if err != nil {
+				logging.ErrorLogger.Fatalf("Ocurrio un error al formar el struct del producto %q: %v", itm.GetID(), err)
+			}
+			itm.SetPrice(price.Float64())
+			itmJSON, err := itm.MarshalJSON()
+			if err != nil {
+				logging.ErrorLogger.Fatalf("Ocurrio un error al crear el json del producto %q: %v", itm.GetID(), err)
+			}
+			e.Request.Ctx.Put("Product", string(itmJSON))
+			fmt.Println(itm.GetID())
+			m.saveProduct(itm)
+
 			if onHTML != nil {
 				onHTML(e)
 			}
@@ -165,6 +227,14 @@ func (m *mixup) productDetails(e *colly.HTMLElement) {
 		item.Details(details),
 	)
 
+	itmJSON, err := product.MarshalJSON()
+	if err != nil {
+		logging.ErrorLogger.Fatalf("Ocurrio un error al crear el json del producto %q: %v", productID, err)
+	}
+	e.Request.Ctx.Put("Product", string(itmJSON))
+}
+
+func (m *mixup) saveProduct(product *item.Item) {
 	if err := m.cacheService.CreateItem(context.Background(), product); err != nil {
 		logging.ErrorLogger.Fatalf("Ocurrio un error al guardar el producto %s: %v", product.GetID(), err)
 	}
