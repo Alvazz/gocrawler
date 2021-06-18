@@ -17,9 +17,13 @@ provider:
         - Effect: 'Allow'
           Action: 'comprehend:*'
           Resource: '*'
+        - Effect: 'Allow'
+          Action: 's3:*'
+          Resource: 'arn:aws:s3:::comparison-shopping-bucket/*'
+
 
   environment:
-    GO_CRAWLER_REDIS_ENDPOINT: comparison-shopping-cache.qlaosm.0001.use1.cache.amazonaws.com
+    GO_CRAWLER_REDIS_ENDPOINT: test-comparison-shopping.qlaosm.0001.use1.cache.amazonaws.com
     GO_CRAWLER_REDIS_PORT: 6379
 
 package:

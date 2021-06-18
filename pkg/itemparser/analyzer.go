@@ -1,6 +1,7 @@
 package itemparser
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"sync"
@@ -8,11 +9,13 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/comprehend"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/leosykes117/gocrawler/pkg/item"
 )
 
 type Analyzer struct {
-	client *comprehend.Comprehend
+	client     *comprehend.Comprehend
+	s3Uploader *s3manager.Uploader
 }
 
 type commentAnalysis struct {
@@ -33,14 +36,16 @@ func NewAnalyzer() {
 		}))
 		svc := comprehend.New(sess)
 		anlz = &Analyzer{
-			client: svc,
+			client:     svc,
+			s3Uploader: s3manager.NewUploader(sess),
 		}
 	})
 }
 
-func (a *Analyzer) AnalyzeComments(productID string, reviews item.Comments) map[string]*commentAnalysis {
+func (a *Analyzer) AnalyzeComments(productID string, itm *item.Item) map[string]*commentAnalysis {
 	var wg sync.WaitGroup
 	commentsAnalyzed := make(map[string]*commentAnalysis)
+	reviews := itm.GetReviews()
 	for i, review := range reviews {
 		analysis := commentAnalysis{}
 		wg.Add(2)
@@ -63,6 +68,13 @@ func (a *Analyzer) AnalyzeComments(productID string, reviews item.Comments) map[
 		wg.Wait()
 		commentKey := fmt.Sprintf("comment:%d:%s", i, productID)
 		commentsAnalyzed[commentKey] = &analysis
+		review.Sentiment = analysis.sentiment
+		review.Entities = analysis.entities
+		reviews[i] = review
+	}
+	productKey := fmt.Sprintf("product-%s.json", itm.GetID())
+	if err := a.saveProduct(productKey, itm); err != nil {
+		fmt.Printf("ERROR al guardar %q en s3: %v\n", productKey, err)
 	}
 	return commentsAnalyzed
 }
@@ -107,4 +119,25 @@ func (a *Analyzer) detectTextEntities(text, lang string) (*comprehend.DetectEnti
 
 func (ca *commentAnalysis) String() string {
 	return fmt.Sprintf("%v\n%v", ca.sentiment, ca.entities)
+}
+
+func (a *Analyzer) saveProduct(filename string, itm *item.Item) error {
+	json, err := itm.MarshalJSON()
+	if err != nil {
+		return err
+	}
+
+	r := bytes.NewReader(json)
+
+	_, err = a.s3Uploader.Upload(&s3manager.UploadInput{
+		Bucket: aws.String("comparison-shopping-bucket"),
+		Key:    aws.String(filename),
+		Body:   r,
+	})
+
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

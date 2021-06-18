@@ -35,10 +35,9 @@ func (parser *itemParser) Task() {
 
 	log.Printf("Analizando los comentarios de %q\n", parser.item.GetID())
 	if len(parser.item.GetReviews()) > 0 {
-		reviewsSentiment := anlz.AnalyzeComments(parser.item.GetID(), parser.item.GetReviews())
+		reviewsSentiment := anlz.AnalyzeComments(parser.item.GetID(), parser.item)
 		if len(reviewsSentiment) > 0 {
 			log.Printf("reviews of %q: %v\n", parser.item.GetID(), reviewsSentiment)
-
 		}
 	}
 

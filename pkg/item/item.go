@@ -6,15 +6,18 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go/service/comprehend"
 	"github.com/leosykes117/gocrawler/pkg/ciphersuite"
 )
 
 type Comment struct {
-	Title   string `redis:"title"`
-	Content string `redis:"content"`
-	Author  string `redis:"author"`
-	Stars   Score  `redis:"stars"`
-	Date    time.Time
+	Title     string                            `json:"title",omitempty`
+	Content   string                            `json:"content",omitempty`
+	Author    string                            `json:"author",omitempty`
+	Stars     Score                             `json:"stars",omitempty`
+	Date      time.Time                         `json:"date",omitempty`
+	Sentiment *comprehend.DetectSentimentOutput `json:"sentiment",omitempty`
+	Entities  *comprehend.DetectEntitiesOutput  `json:"entities",omitempty`
 }
 
 type Score float64
@@ -54,19 +57,22 @@ type Item struct {
 	// Details contiene un diccionario de datos extra del producto que son
 	// especificos de la tienda donde se obtine el producto
 	details ProductDetails
+
+	images []string
 }
 
 type product struct {
-	ID          string         `json:"id"`
-	Name        string         `json:"name"`
-	Price       float64        `json:"price"`
-	Brand       string         `json:"brand"`
-	Description string         `json:"description"`
-	Rating      Score          `json:"score"`
-	Reviews     Comments       `json:"reviews"`
-	SourceStore string         `json:"sourceStore"`
-	URL         string         `json:"url"`
-	Details     ProductDetails `json:"details"`
+	ID          string         `json:"id",omitempty`
+	Name        string         `json:"name",omitempty`
+	Price       float64        `json:"price",omitempty`
+	Brand       string         `json:"brand",omitempty`
+	Description string         `json:"description",omitempty`
+	Rating      Score          `json:"score",omitempty`
+	Reviews     Comments       `json:"reviews",omitempty`
+	SourceStore string         `json:"sourceStore",omitempty`
+	URL         string         `json:"url",omitempty`
+	Details     ProductDetails `json:"details",omitempty`
+	Images      []string
 }
 
 type Items []*Item
@@ -164,6 +170,12 @@ func Details(d ProductDetails) func(*Item) {
 	}
 }
 
+func Images(imgs []string) func(*Item) {
+	return func(i *Item) {
+		i.images = imgs
+	}
+}
+
 // GetID .
 func (i *Item) GetID() string {
 	return i.id
@@ -213,6 +225,10 @@ func (i *Item) GetURL() string {
 // especificos de la tienda donde se obtine el producto
 func (i *Item) GetDetails() ProductDetails {
 	return i.details
+}
+
+func (i *Item) GetImages() []string {
+	return i.images
 }
 
 // SetID .
@@ -266,6 +282,10 @@ func (i *Item) SetDetails(d ProductDetails) {
 	i.details = d
 }
 
+func (i *Item) SetImages(imgs []string) {
+	i.images = imgs
+}
+
 func (i *Item) publicMembers() *product {
 	return &product{
 		ID:          i.id,
@@ -278,6 +298,7 @@ func (i *Item) publicMembers() *product {
 		SourceStore: i.sourceStore,
 		URL:         i.url,
 		Details:     i.details,
+		Images:      i.images,
 	}
 }
 
@@ -300,6 +321,7 @@ func (i *Item) UnMarshalJSON(data string) error {
 	i.sourceStore = tmpItem.SourceStore
 	i.url = tmpItem.URL
 	i.details = tmpItem.Details
+	i.images = tmpItem.Images
 	return nil
 }
 

@@ -87,6 +87,8 @@ func (a *amazon) HTMLEvents(evts ...string) []OnHTMLEvent {
 		case "GetProductReviews":
 			fmt.Println("Aplicando el evento GetProductReviews")
 			e = a.GetProductReviews
+		case "GetImages":
+			e = a.GetImages
 		case "DetectCaptcha":
 			e = a.DetectCaptcha
 		default:
@@ -237,6 +239,36 @@ func getDetails(e *goquery.Selection, details item.ProductDetails) {
 		details[keyText] = valText
 		fmt.Printf("%d\t%q:%q\n", tableIdx, keyText, valText)
 	})
+}
+
+func (a *amazon) GetImages(onHTML colly.HTMLCallback) (string, colly.HTMLCallback) {
+	return "#altImages ul.a-unordered-list.a-nostyle.a-button-list", func(e *colly.HTMLElement) {
+		urlMD5, _ := ciphersuite.GetMD5Hash(e.Request.URL.String())
+		fmt.Printf("[%s]Captacha de la página %q[%s]\n", e.Request.Ctx.Get("ID"), e.Request.AbsoluteURL(e.Request.URL.String()), urlMD5)
+		logging.InfoLogger.Printf("[%s]Captacha de la página %q[%s]\n", e.Request.Ctx.Get("ID"), e.Request.AbsoluteURL(e.Request.URL.String()), urlMD5)
+
+		home := fs.GetUserHomeDir()
+		dir, err := filepath.Abs(filepath.Join(home, "./crawling-data/captchas/"))
+		if err != nil {
+			errStr := fmt.Sprintf("Ocurrio un error al crear la ruta del directorio para captchas %q: %v", e.Request.Ctx.Get("ID"), err)
+			fmt.Println(errStr)
+			logging.ErrorLogger.Println(errStr)
+		}
+		captchaFile := fmt.Sprintf("%s-%s-%s", e.Request.URL.Host, e.Request.URL.Path, e.Request.URL.RawQuery) + ".html"
+		fileName := filepath.Join(dir, captchaFile)
+		filePath, err := fs.CreateFile(fileName)
+		if err != nil {
+			errStr := fmt.Sprintf("Ocurrio un error al crear la ruta del archivo captcha %q: %v", e.Request.Ctx.Get("ID"), err)
+			fmt.Println(errStr)
+			logging.ErrorLogger.Println(errStr)
+		}
+		err = ioutil.WriteFile(filePath, e.Response.Body, 0644)
+		if err != nil {
+			errStr := fmt.Sprintf("Ocurrio un error al crear el archivo captcha %q: %v", e.Request.Ctx.Get("ID"), err)
+			fmt.Println(errStr)
+			logging.ErrorLogger.Println(errStr)
+		}
+	}
 }
 
 // a#customerReviews[href="#"] +
