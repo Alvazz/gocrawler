@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -50,6 +51,7 @@ func (a *Analyzer) AnalyzeComments(productID string, itm *item.Item) map[string]
 		analysis := commentAnalysis{}
 		wg.Add(2)
 		go func() {
+			fmt.Printf("Start sentiment of product %q\n", productID)
 			sentimentData, err := a.analyzeTextSentiment(review.Content, comprehend.LanguageCodeEs)
 			if err != nil {
 				fmt.Println("ERROR al realizar el análisis de sentimiento del comentario: ", err)
@@ -58,6 +60,7 @@ func (a *Analyzer) AnalyzeComments(productID string, itm *item.Item) map[string]
 			wg.Done()
 		}()
 		go func() {
+			fmt.Printf("Start entities of product %q\n", productID)
 			entitiesData, err := a.detectTextEntities(review.Content, comprehend.LanguageCodeEs)
 			if err != nil {
 				fmt.Println("ERROR al realizar la detección de entiedades del comentario: ", err)
@@ -65,6 +68,7 @@ func (a *Analyzer) AnalyzeComments(productID string, itm *item.Item) map[string]
 			analysis.entities = entitiesData
 			wg.Done()
 		}()
+		fmt.Printf("Wait finish requests terminar...\n")
 		wg.Wait()
 		commentKey := fmt.Sprintf("comment:%d:%s", i, productID)
 		commentsAnalyzed[commentKey] = &analysis
@@ -91,10 +95,13 @@ func (a *Analyzer) analyzeTextSentiment(text, lang string) (*comprehend.DetectSe
 	}
 	req, resp := a.client.DetectSentimentRequest(&input)
 
+	reqinit := time.Now()
+	fmt.Printf("Sending request...\n")
 	err := req.Send()
 	if err != nil {
 		return nil, err
 	}
+	fmt.Printf("End request... %s\n", time.Since(reqinit))
 	return resp, nil
 }
 
@@ -110,10 +117,13 @@ func (a *Analyzer) detectTextEntities(text, lang string) (*comprehend.DetectEnti
 	}
 	req, resp := a.client.DetectEntitiesRequest(&input)
 
+	reqinit := time.Now()
+	fmt.Printf("Sending request...\n")
 	err := req.Send()
 	if err != nil {
 		return nil, err
 	}
+	fmt.Printf("End request... %s\n", time.Since(reqinit))
 	return resp, nil
 }
 
