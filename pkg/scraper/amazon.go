@@ -243,31 +243,25 @@ func getDetails(e *goquery.Selection, details item.ProductDetails) {
 
 func (a *amazon) GetImages(onHTML colly.HTMLCallback) (string, colly.HTMLCallback) {
 	return "#altImages ul.a-unordered-list.a-nostyle.a-button-list", func(e *colly.HTMLElement) {
-		urlMD5, _ := ciphersuite.GetMD5Hash(e.Request.URL.String())
-		fmt.Printf("[%s]Captacha de la página %q[%s]\n", e.Request.Ctx.Get("ID"), e.Request.AbsoluteURL(e.Request.URL.String()), urlMD5)
-		logging.InfoLogger.Printf("[%s]Captacha de la página %q[%s]\n", e.Request.Ctx.Get("ID"), e.Request.AbsoluteURL(e.Request.URL.String()), urlMD5)
-
-		home := fs.GetUserHomeDir()
-		dir, err := filepath.Abs(filepath.Join(home, "./crawling-data/captchas/"))
+		fmt.Println("On GetImages")
+		images := make([]string, 0)
+		e.DOM.Find("img[src]").Each(func(i int, img *goquery.Selection) {
+			link, _ := img.Attr("src")
+			images = append(images, link)
+			fmt.Printf("Imagen <%d>: %q\n", i, link)
+		})
+		productJSON := e.Request.Ctx.Get("Product")
+		itm := item.NewItem()
+		err := itm.UnMarshalJSON(productJSON)
 		if err != nil {
-			errStr := fmt.Sprintf("Ocurrio un error al crear la ruta del directorio para captchas %q: %v", e.Request.Ctx.Get("ID"), err)
-			fmt.Println(errStr)
-			logging.ErrorLogger.Println(errStr)
+			logging.ErrorLogger.Fatalf("Ocurrio un error al formar el struct del producto %q: %v", itm.GetID(), err)
 		}
-		captchaFile := fmt.Sprintf("%s-%s-%s", e.Request.URL.Host, e.Request.URL.Path, e.Request.URL.RawQuery) + ".html"
-		fileName := filepath.Join(dir, captchaFile)
-		filePath, err := fs.CreateFile(fileName)
+		itm.SetImages(images)
+		itmJSON, err := itm.MarshalJSON()
 		if err != nil {
-			errStr := fmt.Sprintf("Ocurrio un error al crear la ruta del archivo captcha %q: %v", e.Request.Ctx.Get("ID"), err)
-			fmt.Println(errStr)
-			logging.ErrorLogger.Println(errStr)
+			logging.ErrorLogger.Fatalf("Ocurrio un error al crear el json del producto %q: %v", itm.GetID(), err)
 		}
-		err = ioutil.WriteFile(filePath, e.Response.Body, 0644)
-		if err != nil {
-			errStr := fmt.Sprintf("Ocurrio un error al crear el archivo captcha %q: %v", e.Request.Ctx.Get("ID"), err)
-			fmt.Println(errStr)
-			logging.ErrorLogger.Println(errStr)
-		}
+		e.Request.Ctx.Put("Product", string(itmJSON))
 	}
 }
 

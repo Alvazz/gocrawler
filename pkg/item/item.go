@@ -72,7 +72,7 @@ type product struct {
 	SourceStore string         `json:"sourceStore",omitempty`
 	URL         string         `json:"url",omitempty`
 	Details     ProductDetails `json:"details",omitempty`
-	Images      []string
+	Images      []string       `json:"images",omitempty`
 }
 
 type Items []*Item

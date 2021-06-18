@@ -34,6 +34,7 @@ func (r *itemRepository) Set(ctx context.Context, item *item.Item) error {
 	productKey := fmt.Sprintf("product:%s", productID)
 	commentsKey := fmt.Sprintf("comments:%s", productID)
 	detailsKey := fmt.Sprintf("details:%s", productID)
+	imagesKey := fmt.Sprintf("images:%s", productID)
 
 	// SE CREA LA TRANSACCION
 	err = conn.Send("MULTI")
@@ -41,7 +42,7 @@ func (r *itemRepository) Set(ctx context.Context, item *item.Item) error {
 		return err
 	}
 	// SE CREA EL HASH PRINCIPAL PARA ALMACENAR EL PRODUCTO
-	err = conn.Send("HMSET", productKey, "id", productID, "name", item.GetName(), "brand", item.GetBrand(), "description", item.GetDescription(), "price", item.GetPrice(), "score", item.GetRating(), "reviews", commentsKey, "sourceStore", item.GetSourceStore(), "url", item.GetURL(), "details", detailsKey)
+	err = conn.Send("HMSET", productKey, "id", productID, "name", item.GetName(), "brand", item.GetBrand(), "description", item.GetDescription(), "price", item.GetPrice(), "score", item.GetRating(), "reviews", commentsKey, "sourceStore", item.GetSourceStore(), "url", item.GetURL(), "details", detailsKey, "images", imagesKey)
 	if err != nil {
 		return err
 	}
@@ -63,6 +64,14 @@ func (r *itemRepository) Set(ctx context.Context, item *item.Item) error {
 	// ALMACENA EL MAP DE LOS DETALLES DEL PRODUCTO
 	for k, v := range item.GetDetails() {
 		err = conn.Send("HSETNX", detailsKey, k, v)
+		if err != nil {
+			return err
+		}
+	}
+
+	// CREAR UNA LISTA DE LA IMAGENES
+	for _, image := range item.GetImages() {
+		err = conn.Send("RPUSH", imagesKey, image)
 		if err != nil {
 			return err
 		}
@@ -98,6 +107,7 @@ func (r *itemRepository) Get(ctx context.Context, ID string) (*item.Item, error)
 		rating, price                                  float64
 		reviews                                        item.Comments
 		details                                        item.ProductDetails
+		images                                         []string
 		err                                            error
 	)
 
@@ -140,6 +150,11 @@ func (r *itemRepository) Get(ctx context.Context, ID string) (*item.Item, error)
 			if err != nil {
 				return nil, fmt.Errorf("Error al obtener los detalles del producto: %v", err)
 			}
+		case "images":
+			images, err = r.FetchItemImages(ctx, nil, v)
+			if err != nil {
+				return nil, fmt.Errorf("Error al obtener los detalles del producto: %v", err)
+			}
 		}
 	}
 
@@ -154,6 +169,7 @@ func (r *itemRepository) Get(ctx context.Context, ID string) (*item.Item, error)
 		item.Rating(rating),
 		item.Reviews(reviews),
 		item.Details(details),
+		item.Images(images),
 	)
 	return i, nil
 }
@@ -281,4 +297,23 @@ func (r *itemRepository) Delete(ctx context.Context, keys ...string) error {
 
 	_, err = conn.Do("DEL", args...)
 	return err
+}
+
+func (r *itemRepository) FetchItemImages(ctx context.Context, conn redis.Conn, imagesKey string) ([]string, error) {
+	var (
+		err error
+	)
+	if conn == nil {
+		conn, err = r.pool.GetContext(ctx)
+		defer conn.Close()
+	}
+	if err != nil {
+		return nil, err
+	}
+	images, err := redis.Strings(conn.Do("LRANGE", imagesKey, 0, -1))
+	if err != nil {
+		return nil, err
+	}
+
+	return images, nil
 }

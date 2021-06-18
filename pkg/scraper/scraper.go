@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/gocolly/colly"
-	"github.com/gocolly/colly/debug"
 	"github.com/gocolly/colly/extensions"
 	"github.com/leosykes117/gocrawler/internal/env"
 	"github.com/leosykes117/gocrawler/internal/logging"
@@ -73,7 +72,7 @@ func (s *Scraper) addRequest(rt *requestTracker) {
 
 // GetAllUrls inicia el rasapado de datos
 func (s *Scraper) GetAllUrls() {
-	shopDriver := Mixup
+	shopDriver := Amazon
 	var shop shopCrawler = shopFactory(shopDriver)
 
 	c := colly.NewCollector(
@@ -84,7 +83,7 @@ func (s *Scraper) GetAllUrls() {
 		colly.URLFilters(
 			regexp.MustCompile(shop.GetLinkExtractionQuery()),
 		),
-		colly.Debugger(&debug.LogDebugger{}),
+		// colly.Debugger(&debug.LogDebugger{}),
 	)
 
 	extensions.Referer(c)
@@ -184,7 +183,7 @@ func (s *Scraper) GetAllUrls() {
 		logging.InfoLogger.Printf("OnResponse:\n\tID: %s,\nStartAt: %s", r.Ctx.Get("ID"), strStartAt)
 	})
 
-	funcNames := []string{"ExtractLinks", "GetMetaTags", "GetProductDetails", "GetProductInformation", "GetProductReviews", "DetectCaptcha", "GetProductPrice"}
+	funcNames := []string{"ExtractLinks", "GetMetaTags", "GetProductDetails", "GetProductInformation", "GetProductPrice", "GetImages", "GetProductReviews"}
 	callbacks := []colly.HTMLCallback{
 		func(e *colly.HTMLElement) {
 			link := e.Request.AbsoluteURL(e.Attr("href"))
